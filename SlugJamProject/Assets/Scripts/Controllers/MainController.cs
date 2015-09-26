@@ -35,6 +35,8 @@ public class MainController : Controller, InputManager.InputListener
 
 	public void OnEnter()
 	{
+		Writer.AddEnter ();
+
 		isWaiting = false;
 
 		if(inGameLoop == false)
@@ -56,9 +58,10 @@ public class MainController : Controller, InputManager.InputListener
 
 		Writer.WriteText ("Press SPACE to fill in the gaps");
 
+		yield return StartCoroutine(WaitForSecondsOrBreak(4f));
+
 		while (true) {
 			// countdown
-			yield return StartCoroutine(WaitForSecondsOrBreak(4f));
 			Writer.WriteTextInstant ("3");
 			yield return StartCoroutine(WaitForSecondsOrBreak(1f));
 			Writer.WriteTextInstant ("2");
@@ -85,20 +88,20 @@ public class MainController : Controller, InputManager.InputListener
 				string writtenText = Writer.GetWrittenText();
 				if(writtenText != correctMessage.Substring(0, Mathf.Min(correctMessage.Length, writtenText.Length)))
 				{
-					Debug.Log ("Wrong");
 					Writer.StopWriting();
 					yield return StartCoroutine(WaitForSecondsOrBreak(2f));
 					Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
-					Writer.WriteText("Debug: Player has failed. Press Enter to try again.");
-					break;
+					Writer.WriteText("You failed. Press ENTER");
+					yield return StartCoroutine (WaitForSecondsOrBreak(999999f));
+					//break;
 				} else if (writtenText.Length == correctMessage.Length) 
 				{
-					Debug.Log("Phrase Completed");
 					Writer.StopWriting();
 					yield return StartCoroutine(WaitForSecondsOrBreak(2f));
 					Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
-					Writer.WriteText("Debug: Player successfully completed phrase. Press Enter to go again");
-					break;
+					Writer.WriteText("Nice job. Press ENTER");
+					yield return StartCoroutine(WaitForSecondsOrBreak(999999f));
+					//break;
 				}
 				
 				yield return null;
