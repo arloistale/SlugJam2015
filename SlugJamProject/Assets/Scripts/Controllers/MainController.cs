@@ -40,9 +40,9 @@ public class MainController : Controller, InputManager.InputListener
 		Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
 
 		// intro message
-		Writer.WriteText("Hello.");
+		Writer.WriteText("Hello. Welcome to the installation called Spacer 98");
 
-		yield return new WaitForSeconds(3f);
+		yield return new WaitForSeconds(5f);
 
 		Writer.WriteText ("Press SPACE to fill in the gaps");
 
@@ -56,8 +56,9 @@ public class MainController : Controller, InputManager.InputListener
 			//Debug.Log (rawMessage + " | " + randomPhrase.correctMessage);
 			string correctMessage = randomPhrase.correctMessage;
 			string theme = randomPhrase.messageTheme;
+			int wordCount = randomPhrase.correctMessage.Split(' ').Length;
 
-			Writer.WriteText (theme);
+			Writer.WriteText (theme + "\n" + wordCount + " words");
 
 			// countdown
 			yield return new WaitForSeconds (4f);
