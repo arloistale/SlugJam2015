@@ -40,7 +40,7 @@ public class MainController : Controller, InputManager.InputListener
 		Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
 
 		// intro message
-		Writer.WriteText("Hello. Welcome to the installation called Spacer 98");
+		Writer.WriteText("Hello. Welcome to this installation know as SpaceBar");
 
 		yield return new WaitForSeconds(5f);
 
