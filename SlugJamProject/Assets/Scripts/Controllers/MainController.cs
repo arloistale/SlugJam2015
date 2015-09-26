@@ -47,6 +47,18 @@ public class MainController : Controller, InputManager.InputListener
 		Writer.WriteText ("Press SPACE to fill in the gaps");
 
 		while (true) {
+			yield return new WaitForSeconds (4f);
+
+			// get a random phrase and generate a raw message from the phrase
+			int phraseIndex = Random.Range (0, Phrases.Length);
+			Phrase randomPhrase = Phrases[phraseIndex];
+			string rawMessage = Regex.Replace(randomPhrase.correctMessage, @"\s+", "");
+			//Debug.Log (rawMessage + " | " + randomPhrase.correctMessage);
+			string correctMessage = randomPhrase.correctMessage;
+			string theme = randomPhrase.messageTheme;
+
+			Writer.WriteText (theme);
+
 			// countdown
 			yield return new WaitForSeconds (4f);
 			Writer.WriteTextInstant ("3");
@@ -57,13 +69,6 @@ public class MainController : Controller, InputManager.InputListener
 			yield return new WaitForSeconds (1f);
 
 			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_LONG);
-
-			// get a random phrase and generate a raw message from the phrase
-			int phraseIndex = Random.Range (0, Phrases.Length);
-			Phrase randomPhrase = Phrases[phraseIndex];
-			string rawMessage = Regex.Replace(randomPhrase.correctMessage, @"\s+", "");
-			//Debug.Log (rawMessage + " | " + randomPhrase.correctMessage);
-			string correctMessage = randomPhrase.correctMessage;
 
 			// start writing raw message
 			Writer.WriteText (rawMessage);
