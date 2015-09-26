@@ -11,5 +11,4 @@ public class Phrase
 	/// </summary>
 	public string correctMessage = "Default phrase message correct";
 	public string messageTheme = "Default theme";
-	private int wordCount = 0;
 }

@@ -11,6 +11,8 @@ public class MainController : Controller, InputManager.InputListener
 	// coroutine data
 	private Coroutine mainCoroutine;
 
+	private bool inGameLoop = false;
+
 	protected override void Awake()
 	{
 		base.Awake ();
@@ -25,7 +27,12 @@ public class MainController : Controller, InputManager.InputListener
 
 	public void OnSpace()
 	{
-		Writer.AddSpace ();
+
+		if (inGameLoop) 
+		{
+			Writer.AddSpace ();
+			Writer.setTextToStatusColor (1);
+		}
 	}
 
 	public void OnEnter()
@@ -40,7 +47,7 @@ public class MainController : Controller, InputManager.InputListener
 		Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
 
 		// intro message
-		Writer.WriteText("Hello. Welcome to this installation know as SpaceBar");
+		Writer.WriteText("Hello. Welcome to this installation known as SpaceBar");
 
 		yield return new WaitForSeconds(5f);
 
@@ -77,17 +84,20 @@ public class MainController : Controller, InputManager.InputListener
 			// here we check the written message against the correct message
 			while(Writer.isWriting)
 			{
+				inGameLoop = true;
+				//Writer.setTextToStatusColor(1);
 				string writtenText = Writer.GetWrittenText();
 				if(writtenText != correctMessage.Substring(0, Mathf.Min(correctMessage.Length, writtenText.Length)))
 				{
 					Debug.Log ("Wrong");
+					Writer.setTextToStatusColor(2);
 					Writer.StopWriting();
 					break;
 				}
 
 				yield return null;
 			}
-
+			inGameLoop = false;
 			yield return new WaitForSeconds(1.5f);
 
 			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
