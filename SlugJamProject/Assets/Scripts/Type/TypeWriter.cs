@@ -9,7 +9,8 @@ public class TypeWriter : MonoBehaviour
 	public const float TYPE_DURATION_LONG = 1f;
 
 	// external data
-	public AudioClip TypeSound;
+	public AudioClip[] TypeSounds = new AudioClip[] {};
+	public AudioClip TypeSoundSpace;
 
 	// UI
 	public Text TypeText;
@@ -29,6 +30,11 @@ public class TypeWriter : MonoBehaviour
 	{
 		if (typeCoroutine != null)
 			StopCoroutine (typeCoroutine);
+
+		if (TypeSounds != null) {
+			int soundIndex = Random.Range(0, TypeSounds.Length);
+			SoundManager.Instance.PlaySound (TypeSounds[soundIndex], transform.position);
+		}
 
 		TypeText.text = message;
 	}
@@ -57,7 +63,16 @@ public class TypeWriter : MonoBehaviour
 
 	public void AddSpace() 
 	{
+		if(TypeSoundSpace != null)
+			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
+
 		TypeText.text += " ";
+	}
+
+	public void AddEnter()
+	{
+		if(TypeSoundSpace != null)
+			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
 	}
 
 	public void SetTypeDuration(float duration)
@@ -77,8 +92,10 @@ public class TypeWriter : MonoBehaviour
 			char letter = typeMessageChars[typeIndex];
 			TypeText.text += letter;
 
-			if (TypeSound != null)
-				SoundManager.Instance.PlaySound(TypeSound, transform.position);
+			if (TypeSounds != null) {
+				int soundIndex = Random.Range(0, TypeSounds.Length);
+				SoundManager.Instance.PlaySound (TypeSounds[soundIndex], transform.position);
+			}
 
 			yield return new WaitForSeconds (typePauseDuration);
 		}
