@@ -4,6 +4,10 @@ using System.Collections;
 
 public class TypeWriter : MonoBehaviour 
 {
+	// constants
+	public const float TYPE_DURATION_SHORT = 0.05f;
+	public const float TYPE_DURATION_LONG = 1f;
+
 	// external data
 	public AudioClip TypeSound;
 
@@ -56,7 +60,7 @@ public class TypeWriter : MonoBehaviour
 		TypeText.text += " ";
 	}
 
-	public void SetPauseDuration(float duration)
+	public void SetTypeDuration(float duration)
 	{
 		typePauseDuration = duration;
 	}

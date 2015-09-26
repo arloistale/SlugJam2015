@@ -4,10 +4,11 @@ using System.Collections;
 
 public class MainController : Controller, InputManager.InputListener
 {
+	// type data
 	public TypeWriter Writer;
-
 	public Phrase[] Phrases = new Phrase[] {};
 
+	// coroutine data
 	private Coroutine mainCoroutine;
 
 	protected override void Awake()
@@ -36,7 +37,7 @@ public class MainController : Controller, InputManager.InputListener
 	{
 		yield return new WaitForSeconds (1f);
 
-		Writer.SetPauseDuration (0.05f);
+		Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
 
 		// intro message
 		Writer.WriteText("Hello.");
@@ -55,7 +56,7 @@ public class MainController : Controller, InputManager.InputListener
 			Writer.WriteTextInstant ("1");
 			yield return new WaitForSeconds (1f);
 
-			Writer.SetPauseDuration (1f);
+			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_LONG);
 
 			// get a random phrase and generate a raw message from the phrase
 			int phraseIndex = Random.Range (0, Phrases.Length);
@@ -83,7 +84,7 @@ public class MainController : Controller, InputManager.InputListener
 
 			yield return new WaitForSeconds(1.5f);
 
-			Writer.SetPauseDuration (0.05f);
+			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
 
 			Writer.WriteText("Great job! Ready for more?");
 		}
