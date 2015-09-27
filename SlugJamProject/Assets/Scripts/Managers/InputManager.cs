@@ -24,20 +24,17 @@ public class InputManager : PersistentSingleton<InputManager>
 			return;
 		}
 
-		/*
-		if ( CrossPlatformInputManager.GetButtonDown("Cancel") )
-			GameManager.Instance.Pause();
-		
-		if (GameManager.Instance.Paused)
-			return;	
-		
-		// if the player can't move for some reason, we do nothing else
-		if (!GameManager.Instance.CanMove)
-			return;
-		*/
 		if (CrossPlatformInputManager.GetButtonDown ("Space")) 
 		{
 			inputListener.OnSpace();
+		}
+
+		int fingerCount = 0;
+		if(Input.touchCount > 0)
+		{
+			Touch mainTouch = Input.touches[0];
+			if (mainTouch.phase == TouchPhase.Began && mainTouch.tapCount == 1)
+				inputListener.OnSpace();
 		}
 	}
 

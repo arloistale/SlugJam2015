@@ -7,7 +7,7 @@ public class TypeWriter : MonoBehaviour
 	// constants
 	public const float TYPE_DURATION_SHORT = 0.05f;
 	public const float TYPE_DURATION_LONG = 0.5f;
-	public const float TYPE_DURATION_MEDIUM = 0.27f;
+	public const float TYPE_DURATION_MEDIUM = 0.275f;
 	public const float TYPE_DURATION_DIFFICULT = 0.1f;
 
 	// external data
@@ -73,12 +73,6 @@ public class TypeWriter : MonoBehaviour
 		TypeText.text += " ";
 	}
 
-	public void AddEnter()
-	{
-		if(TypeSoundSpace != null)
-			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
-	}
-
 	public void SetTypeDuration(float duration)
 	{
 		typePauseDuration = duration;
@@ -114,7 +108,8 @@ public class TypeWriter : MonoBehaviour
 			TypeText.text += letter;
 			setTextToStatusColor(0);
 
-			if (TypeSounds != null) {
+			if (TypeSounds != null) 
+			{
 				int soundIndex = Random.Range(0, TypeSounds.Length);
 				SoundManager.Instance.PlaySound (TypeSounds[soundIndex], transform.position);
 			}
