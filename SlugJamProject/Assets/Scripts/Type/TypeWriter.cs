@@ -6,7 +6,9 @@ public class TypeWriter : MonoBehaviour
 {
 	// constants
 	public const float TYPE_DURATION_SHORT = 0.05f;
-	public const float TYPE_DURATION_LONG = 1f;
+	public const float TYPE_DURATION_LONG = 0.5f;
+	public const float TYPE_DURATION_MEDIUM = 0.35f;
+	public const float TYPE_DURATION_DIFFICULT = 0.1f;
 
 	// external data
 	public AudioClip[] TypeSounds = new AudioClip[] {};
@@ -54,6 +56,8 @@ public class TypeWriter : MonoBehaviour
 	{
 		if (typeCoroutine != null)
 			StopCoroutine (typeCoroutine);
+
+		isWriting = false;
 	}
 
 	public string GetWrittenText() 

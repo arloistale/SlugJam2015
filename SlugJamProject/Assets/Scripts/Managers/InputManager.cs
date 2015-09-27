@@ -39,11 +39,6 @@ public class InputManager : PersistentSingleton<InputManager>
 		{
 			inputListener.OnSpace();
 		}
-		
-		if (CrossPlatformInputManager.GetButtonDown ("Submit")) 
-		{
-			inputListener.OnEnter();
-		}
 	}
 
 	/// <summary>
@@ -59,8 +54,5 @@ public class InputManager : PersistentSingleton<InputManager>
 	{
 		// when SPACE action is pressed
 		void OnSpace();
-
-		// when ENTER action is pressed
-		void OnEnter();
 	}
 }

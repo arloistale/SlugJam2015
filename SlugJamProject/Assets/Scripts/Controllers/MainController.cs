@@ -8,6 +8,8 @@ public class MainController : Controller, InputManager.InputListener
 	// type data
 	public TypeWriter Writer;
 	public Phrase[] Phrases = new Phrase[] {};
+	public AudioClip errorSound;
+	public AudioClip successSound;
 
 	// coroutine data
 	private Coroutine mainCoroutine;
@@ -30,15 +32,13 @@ public class MainController : Controller, InputManager.InputListener
 
 	public void OnSpace()
 	{
-		Writer.AddSpace ();
-	}
+		if (!isActive)
+			return;
 
-	public void OnEnter()
-	{
-		Writer.AddEnter ();
+		Writer.AddSpace ();
 
 		isWaiting = false;
-
+		
 		if(inGameLoop == false)
 		{
 			Writer.WriteText("");
@@ -47,6 +47,8 @@ public class MainController : Controller, InputManager.InputListener
 
 	private IEnumerator IntroCoroutine()
 	{
+		GameManager.Instance.SetPoints (0);
+
 		yield return StartCoroutine (WaitForSecondsOrBreak (1f));
 
 		Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
@@ -61,6 +63,21 @@ public class MainController : Controller, InputManager.InputListener
 		yield return StartCoroutine(WaitForSecondsOrBreak(4f));
 
 		while (true) {
+			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
+
+			// get a random phrase and generate a raw message from the phrase
+			int phraseIndex = UnityEngine.Random.Range (0, Phrases.Length);
+			Phrase randomPhrase = Phrases[phraseIndex];
+			string rawMessage = Regex.Replace(randomPhrase.correctMessage, @"\s+", "");
+			//Debug.Log (rawMessage + " | " + randomPhrase.correctMessage);
+			string correctMessage = randomPhrase.correctMessage;
+			string theme = randomPhrase.messageTheme;
+			int wordCount = randomPhrase.correctMessage.Split(' ').Length;
+
+			Writer.WriteText (rawMessage + "\n" + wordCount + " words");
+
+			yield return StartCoroutine(WaitForSecondsOrBreak(5f));
+
 			// countdown
 			Writer.WriteTextInstant ("3");
 			yield return StartCoroutine(WaitForSecondsOrBreak(1f));
@@ -69,17 +86,12 @@ public class MainController : Controller, InputManager.InputListener
 			Writer.WriteTextInstant ("1");
 			yield return StartCoroutine(WaitForSecondsOrBreak(1f));
 
-			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_LONG);
-
-			// get a random phrase and generate a raw message from the phrase
-			int phraseIndex = UnityEngine.Random.Range (0, Phrases.Length);
-			Phrase randomPhrase = Phrases[phraseIndex];
-			string rawMessage = Regex.Replace(randomPhrase.correctMessage, @"\s+", "");
-			//Debug.Log (rawMessage + " | " + randomPhrase.correctMessage);
-			string correctMessage = randomPhrase.correctMessage;
-
+			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_MEDIUM);
+			
 			// start writing raw message
 			Writer.WriteText (rawMessage);
+
+			bool writeResult = true;
 
 			// here we check the written message against the correct message
 			while(Writer.isWriting)
@@ -89,33 +101,22 @@ public class MainController : Controller, InputManager.InputListener
 				if(writtenText != correctMessage.Substring(0, Mathf.Min(correctMessage.Length, writtenText.Length)))
 				{
 					Writer.StopWriting();
-					yield return StartCoroutine(WaitForSecondsOrBreak(2f));
-					Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
-					Writer.WriteText("You failed. Press ENTER");
-					yield return StartCoroutine (WaitForSecondsOrBreak(999999f));
-					//break;
-				} else if (writtenText.Length == correctMessage.Length) 
-				{
-					Writer.StopWriting();
-					yield return StartCoroutine(WaitForSecondsOrBreak(2f));
-					Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
-					Writer.WriteText("Nice job. Press ENTER");
-					yield return StartCoroutine(WaitForSecondsOrBreak(999999f));
-					//break;
+					writeResult = false;
 				}
 				
 				yield return null;
 			}
 
+			if(writeResult)
+				GameManager.Instance.AddPoints(1);
+			else
+				GameManager.Instance.SetPoints(0);
+
+			Writer.SetTypeDuration(TypeWriter.TYPE_DURATION_SHORT);
+			Writer.WriteText("Streak: " + GameManager.Instance.Points);
+			yield return StartCoroutine(WaitForSecondsOrBreak(2f));
+
 			inGameLoop = false;
-
-			/*
-			yield return new WaitForSeconds(1.5f);
-
-			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
-
-			Writer.WriteText("Great job! Ready for more?");
-			*/
 		}
 	}
 
@@ -124,7 +125,7 @@ public class MainController : Controller, InputManager.InputListener
 		isWaiting = true;
 		DateTime startTime = System.DateTime.UtcNow;
 		TimeSpan waitDuration = TimeSpan.FromSeconds(duration);
-		while (isWaiting) 
+		while (isWaiting)
 		{
 			if(System.DateTime.UtcNow - startTime >= waitDuration)
 			{

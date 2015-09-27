@@ -16,12 +16,6 @@ public class EntryController : Controller, InputManager.InputListener
 	{
 		if (!isActive)
 			return;
-	}
-
-	public void OnEnter()
-	{
-		if (!isActive)
-			return;
 
 		Go (GoLevelName);
 	}
