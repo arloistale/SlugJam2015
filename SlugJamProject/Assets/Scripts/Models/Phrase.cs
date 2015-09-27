@@ -10,5 +10,4 @@ public class Phrase
 	/// The phrase is scrapped of spaces in order to create the raw message fed to the player.
 	/// </summary>
 	public string correctMessage = "Default phrase message correct";
-	public string messageTheme = "Default theme";
 }

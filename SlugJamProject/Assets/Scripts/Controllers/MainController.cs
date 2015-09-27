@@ -38,8 +38,11 @@ public class MainController : Controller, InputManager.InputListener
 		Writer.AddSpace ();
 
 		isWaiting = false;
-		
-		if(inGameLoop == false)
+
+		if (inGameLoop) 
+		{
+			Writer.setTextToStatusColor (1);
+		} else 
 		{
 			Writer.WriteText("");
 		}
@@ -71,21 +74,12 @@ public class MainController : Controller, InputManager.InputListener
 			string rawMessage = Regex.Replace(randomPhrase.correctMessage, @"\s+", "");
 			//Debug.Log (rawMessage + " | " + randomPhrase.correctMessage);
 			string correctMessage = randomPhrase.correctMessage;
-			string theme = randomPhrase.messageTheme;
 			int wordCount = randomPhrase.correctMessage.Split(' ').Length;
 
 			Writer.WriteText (rawMessage + "\n" + wordCount + " words");
 
 			yield return StartCoroutine(WaitForSecondsOrBreak(5f));
-
-			// countdown
-			Writer.WriteTextInstant ("3");
-			yield return StartCoroutine(WaitForSecondsOrBreak(1f));
-			Writer.WriteTextInstant ("2");
-			yield return StartCoroutine(WaitForSecondsOrBreak(1f));
-			Writer.WriteTextInstant ("1");
-			yield return StartCoroutine(WaitForSecondsOrBreak(1f));
-
+		
 			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_MEDIUM);
 			
 			// start writing raw message
@@ -97,9 +91,21 @@ public class MainController : Controller, InputManager.InputListener
 			while(Writer.isWriting)
 			{
 				inGameLoop = true;
+
+				//Writer.setTextToStatusColor(1);
 				string writtenText = Writer.GetWrittenText();
+
+				if(writtenText == correctMessage)
+				{
+					break;
+				}
+
 				if(writtenText != correctMessage.Substring(0, Mathf.Min(correctMessage.Length, writtenText.Length)))
 				{
+					if(errorSound != null)
+						SoundManager.Instance.PlaySound(errorSound, transform.position);
+
+					Writer.setTextToStatusColor(2);
 					Writer.StopWriting();
 					writeResult = false;
 				}
@@ -107,10 +113,19 @@ public class MainController : Controller, InputManager.InputListener
 				yield return null;
 			}
 
-			if(writeResult)
+			yield return StartCoroutine(WaitForSecondsOrBreak(1f));
+
+			if(writeResult) 
+			{
+				if(successSound != null)
+					SoundManager.Instance.PlaySoundModulated(successSound, transform.position);
+
 				GameManager.Instance.AddPoints(1);
+			}
 			else
+			{
 				GameManager.Instance.SetPoints(0);
+			}
 
 			Writer.SetTypeDuration(TypeWriter.TYPE_DURATION_SHORT);
 			Writer.WriteText("Streak: " + GameManager.Instance.Points);

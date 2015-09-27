@@ -71,4 +71,44 @@ public class SoundManager : PersistentSingleton<SoundManager>
 		// we return the audiosource reference
 		return audioSource;
 	}
+
+	/// <summary>
+	/// Plays a sound with random pitch
+	/// </summary>
+	/// <returns>An audiosource</returns>
+	/// <param name="Sfx">The sound clip you want to play.</param>
+	/// <param name="Location">The location of the sound.</param>
+	/// <param name="Volume">The volume of the sound.</param>
+	public AudioSource PlaySoundModulated(AudioClip Sfx, Vector3 Location)
+	{
+		if (!SfxOn)
+			return null;
+		// we create a temporary game object to host our audio source
+		GameObject temporaryAudioHost = new GameObject("TempAudio");
+		// we set the temp audio's position
+		temporaryAudioHost.transform.position = Location;
+		// we add an audio source to that host
+		AudioSource audioSource = temporaryAudioHost.AddComponent<AudioSource>() as AudioSource; 
+		// we set that audio source clip to the one in paramaters
+		audioSource.clip = Sfx; 
+		// we set the audio source volume to the one in parameters
+		audioSource.volume = SfxVolume;
+
+		// generate normal dist between 0 and 3
+		System.Random rand = new System.Random(); //reuse this if you are generating many
+		float u1 = (float) rand.NextDouble(); //these are uniform(0,1) random doubles
+		float u2 = (float) rand.NextDouble();
+		float randStdNormal = Mathf.Sqrt(-2.0f * Mathf.Log(u1)) *
+			Mathf.Sin(2.0f * Mathf.PI * u2); //random normal(0,1)
+		float randNormal =
+			1.25f + 1.0f * randStdNormal; //random normal(mean,stdDev^2)
+
+		audioSource.pitch = randNormal;
+		// we start playing the sound
+		audioSource.Play(); 
+		// we destroy the host after the clip has played
+		Destroy(temporaryAudioHost, Sfx.length);
+		// we return the audiosource reference
+		return audioSource;
+	}
 }
