@@ -20,6 +20,10 @@ public class EntryController : Controller, InputManager.InputListener
 		Go (GoLevelName);
 	}
 
+	public void OnDoubleSpace()
+	{
+	}
+
 	/// <summary>
 	/// Go the specified levelName.
 	/// </summary>

@@ -4,10 +4,16 @@ using System.Collections;
 
 public class TypeWriter : MonoBehaviour 
 {
+	public enum WriterMode
+	{
+		Normal,
+		CullSpaces
+	}
+
 	// constants
 	public const float TYPE_DURATION_SHORT = 0.05f;
 	public const float TYPE_DURATION_LONG = 0.5f;
-	public const float TYPE_DURATION_MEDIUM = 0.275f;
+	public const float TYPE_DURATION_MEDIUM = 0.15f;
 	public const float TYPE_DURATION_DIFFICULT = 0.1f;
 
 	// external data
@@ -17,16 +23,27 @@ public class TypeWriter : MonoBehaviour
 	// UI
 	public Text TypeText;
 
-	// internal data
+	// coroutine data
 	private Coroutine typeCoroutine;
 
 	// type data
-	private float typePauseDuration = 0.2f;
+	private WriterMode writerMode;
 
-	private string typeMessageRaw;
+	private float typePauseDuration = 0.2f;
+	private string typeMessage;
 	private int typeIndex;
 
 	public bool isWriting { get; private set; }
+
+	public void SetMode(WriterMode mode)
+	{
+		writerMode = mode;
+	}
+
+	public WriterMode GetMode()
+	{
+		return writerMode;
+	}
 
 	public void WriteTextInstant(string message)
 	{
@@ -41,10 +58,10 @@ public class TypeWriter : MonoBehaviour
 		TypeText.text = message;
 	}
 
-	public void WriteText(string messageRaw)
+	public void WriteText(string message)
 	{
 		TypeText.text = "";
-		typeMessageRaw = messageRaw;
+		typeMessage = message;
 
 		if (typeCoroutine != null)
 			StopCoroutine (typeCoroutine);
@@ -52,11 +69,17 @@ public class TypeWriter : MonoBehaviour
 		typeCoroutine = StartCoroutine (WriteTextCoroutine ());
 	}
 
+	public void ClearWriting()
+	{
+		TypeText.text = "";
+	}
+
 	public void StopWriting()
 	{
 		if (typeCoroutine != null)
 			StopCoroutine (typeCoroutine);
 
+		typeMessage = null;
 		isWriting = false;
 	}
 
@@ -88,25 +111,20 @@ public class TypeWriter : MonoBehaviour
 			TypeText.color = Color.red;
 	}
 
-	/*void OnGUI()
-	{
-		GUIStyle style = new GUIStyle ();
-		style.richText = true;
-		if(TypeText.text.Length > 1) GUILayout.Label("<color=black>" + TypeText.text[1].ToString() + "</color>",style);
-	}*/
-
 	private IEnumerator WriteTextCoroutine () 
 	{
 		typeIndex = 0;
-		char[] typeMessageChars = typeMessageRaw.ToCharArray ();
+		char[] typeMessageChars = typeMessage.ToCharArray ();
 
 		isWriting = true;
 
-		for(; typeIndex < typeMessageChars.Length; typeIndex++)
-		{
-			char letter = typeMessageChars[typeIndex];
-			TypeText.text += letter;
-			setTextToStatusColor(0);
+		for (; typeIndex < typeMessageChars.Length; typeIndex++) {
+			char letter = typeMessageChars [typeIndex];
+			if (letter != ' ' || writerMode == WriterMode.Normal)
+			{
+				TypeText.text += letter;
+				setTextToStatusColor(0);
+			}
 
 			if (TypeSounds != null) 
 			{
@@ -116,6 +134,7 @@ public class TypeWriter : MonoBehaviour
 
 			yield return new WaitForSeconds (typePauseDuration);
 		}
+
 		isWriting = false;
 	}
 }

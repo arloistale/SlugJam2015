@@ -29,7 +29,11 @@ public class InputManager : PersistentSingleton<InputManager>
 			inputListener.OnSpace();
 		}
 
-		int fingerCount = 0;
+		if (CrossPlatformInputManager.GetButtonDown ("Submit")) 
+		{
+			inputListener.OnDoubleSpace();
+		}
+
 		if(Input.touchCount > 0)
 		{
 			Touch mainTouch = Input.touches[0];
@@ -49,7 +53,10 @@ public class InputManager : PersistentSingleton<InputManager>
 	/// Interface between input commands and actions.
 	public interface InputListener
 	{
-		// when SPACE action is pressed
+		// when SPACE action is tapped
 		void OnSpace();
+
+		// when SPACE action is double tapped
+		void OnDoubleSpace();
 	}
 }
