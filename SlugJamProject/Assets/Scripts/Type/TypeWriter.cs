@@ -14,7 +14,6 @@ public class TypeWriter : MonoBehaviour
 	public const float TYPE_DURATION_SHORT = 0.05f;
 	public const float TYPE_DURATION_LONG = 0.5f;
 	public const float TYPE_DURATION_MEDIUM = 0.15f;
-	public const float TYPE_DURATION_DIFFICULT = 0.1f;
 
 	// external data
 	public AudioClip[] TypeSounds = new AudioClip[] {};

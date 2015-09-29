@@ -8,10 +8,15 @@ using UnityStandardAssets.CrossPlatformInput;
 /// </summary>
 public class InputManager : PersistentSingleton<InputManager>
 {
+	private const float DURATION_HOLD = 0.5f;
+
 	/// <summary>
 	/// The input listener that commands are sent to.
 	/// </summary>
 	private static InputListener inputListener;
+
+	// coroutine data
+	private Coroutine holdCoroutine;
 	
 	/// <summary>
 	/// At update, we check the various commands and send them to the input listener.
@@ -36,7 +41,7 @@ public class InputManager : PersistentSingleton<InputManager>
 
 		if (CrossPlatformInputManager.GetButtonDown ("Submit")) 
 		{
-			inputListener.OnTapLong();
+			inputListener.OnTapHold();
 		}
 
 		if(Input.touchCount > 0)
@@ -45,9 +50,18 @@ public class InputManager : PersistentSingleton<InputManager>
 			if (mainTouch.tapCount == 1)
 			{
 				if(mainTouch.phase == TouchPhase.Began)
+				{
 					inputListener.OnTapBegin();
+
+					holdCoroutine = StartCoroutine(HoldCoroutine());
+				}
 				else if(mainTouch.phase == TouchPhase.Ended)
+				{
 					inputListener.OnTapEnd();
+
+					if(holdCoroutine != null)
+						StopCoroutine(holdCoroutine);
+				}
 			}
 		}
 	}
@@ -60,6 +74,14 @@ public class InputManager : PersistentSingleton<InputManager>
 		inputListener = listener;
 	}
 
+	private IEnumerator HoldCoroutine()
+	{
+		yield return new WaitForSeconds (DURATION_HOLD);
+
+		Debug.Log ("Calling hold!");
+		inputListener.OnTapHold ();
+	}
+
 	/// Interface between input commands and actions.
 	public interface InputListener
 	{
@@ -70,6 +92,6 @@ public class InputManager : PersistentSingleton<InputManager>
 		void OnTapEnd();
 
 		// when SPACE action is double tapped
-		void OnTapLong();
+		void OnTapHold();
 	}
 }

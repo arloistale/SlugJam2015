@@ -24,7 +24,7 @@ public class EntryController : Controller, InputManager.InputListener
 		Go (GoLevelName);
 	}
 
-	public void OnTapLong()
+	public void OnTapHold()
 	{
 	}
 

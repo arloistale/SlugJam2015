@@ -9,6 +9,8 @@ public class MainController : Controller, InputManager.InputListener
 {
 	private const string KEY_HIGH_STREAK = "High Streak";
 
+	private const float DURATION_STOP = 999999f;
+
 	// type data
 	public TypeWriter Writer;
 	public Phrase[] Phrases = new Phrase[] {};
@@ -32,7 +34,7 @@ public class MainController : Controller, InputManager.InputListener
 	private void Start()
 	{
 		//mainCoroutine = StartCoroutine (IntroCoroutine ());
-		StartCoroutine (IntroCoroutine ());
+		StartCoroutine (MainCoroutine ());
 
 		int prefsHighStreak = PlayerPrefs.GetInt (KEY_HIGH_STREAK, 0);
 		GameManager.Instance.SetPointsThreshold(prefsHighStreak);
@@ -58,14 +60,22 @@ public class MainController : Controller, InputManager.InputListener
 		isWaiting = false;
 	}
 
-	public void OnTapLong()
+	public void OnTapHold()
 	{
 		Debug.Log ("Saved");
-		ParseObject testObject = new ParseObject("TestObject");
-		testObject["foo"] = "bar";
+		//ParseObject testObject = new ParseObject("TestObject");
+		//testObject["foo"] = "bar";
 	}
 
-	private IEnumerator IntroCoroutine()
+	private IEnumerator LoadingCoroutine()
+	{
+		Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_LONG);
+		Writer.WriteText ("...");
+
+		yield return null;
+	}
+
+	private IEnumerator MainCoroutine()
 	{
 		GameManager.Instance.SetPoints (0);
 
@@ -76,16 +86,16 @@ public class MainController : Controller, InputManager.InputListener
 		// intro message
 		if (GameManager.Instance.PointsThreshold == 0)
 		{
-			Writer.WriteText ("Hello.\nHold to view leaderboard");
-			yield return StartCoroutine (WaitForSecondsOrBreak (3f));
+			Writer.WriteText ("Hello.\nTap to continue\nHold to view leaderboard");
+			yield return StartCoroutine (WaitForSecondsOrBreak (DURATION_STOP));
 		}
 		else
 		{
-			Writer.WriteText("Highest: " + GameManager.Instance.PointsThreshold + "\nHold to view leaderboard");
-			yield return StartCoroutine (WaitForSecondsOrBreak (3f));
+			Writer.WriteText("Highest: " + GameManager.Instance.PointsThreshold + "\nTap to continue\nHold to view leaderboard");
+			yield return StartCoroutine (WaitForSecondsOrBreak (DURATION_STOP));
 		}
 
-		string instructionsMessage = "Tap the SPACE to separate words as they are typed";
+		string instructionsMessage = "Tap to add SPACE between words as they are typed";
 
 		Writer.SetMode (TypeWriter.WriterMode.Normal);
 		Writer.WriteText (instructionsMessage);
@@ -172,11 +182,11 @@ public class MainController : Controller, InputManager.InputListener
 
 				Writer.WriteText("Streak: " + GameManager.Instance.Points + 
 				                 "\nHighest: " + GameManager.Instance.PointsThreshold + 
-				                 "\nTap the SPACE to continue" +
+				                 "\nTap to retry" +
 				                 "\nHold to add to leaderboard");
 
 				GameManager.Instance.SetPoints(0);
-				yield return StartCoroutine(WaitForSecondsOrBreak(999999f));
+				yield return StartCoroutine(WaitForSecondsOrBreak(DURATION_STOP));
 			}
 		}
 	}
