@@ -26,19 +26,29 @@ public class InputManager : PersistentSingleton<InputManager>
 
 		if (CrossPlatformInputManager.GetButtonDown ("Space")) 
 		{
-			inputListener.OnSpace();
+			inputListener.OnTapBegin ();
+		}
+
+		if (CrossPlatformInputManager.GetButtonUp ("Space")) 
+		{
+			inputListener.OnTapEnd();
 		}
 
 		if (CrossPlatformInputManager.GetButtonDown ("Submit")) 
 		{
-			inputListener.OnDoubleSpace();
+			inputListener.OnTapLong();
 		}
 
 		if(Input.touchCount > 0)
 		{
 			Touch mainTouch = Input.touches[0];
-			if (mainTouch.phase == TouchPhase.Began && mainTouch.tapCount == 1)
-				inputListener.OnSpace();
+			if (mainTouch.tapCount == 1)
+			{
+				if(mainTouch.phase == TouchPhase.Began)
+					inputListener.OnTapBegin();
+				else if(mainTouch.phase == TouchPhase.Ended)
+					inputListener.OnTapEnd();
+			}
 		}
 	}
 
@@ -53,10 +63,13 @@ public class InputManager : PersistentSingleton<InputManager>
 	/// Interface between input commands and actions.
 	public interface InputListener
 	{
-		// when SPACE action is tapped
-		void OnSpace();
+		// when tap begins
+		void OnTapBegin();
+
+		// when tap ends
+		void OnTapEnd();
 
 		// when SPACE action is double tapped
-		void OnDoubleSpace();
+		void OnTapLong();
 	}
 }

@@ -17,7 +17,7 @@ public class MainController : Controller, InputManager.InputListener
 
 	// coroutine data
 	private Coroutine waitCoroutine;
-	private Coroutine mainCoroutine;
+	//private Coroutine mainCoroutine;
 
 	// internal data
 	private bool isWaiting;
@@ -31,13 +31,14 @@ public class MainController : Controller, InputManager.InputListener
 
 	private void Start()
 	{
-		mainCoroutine = StartCoroutine (IntroCoroutine ());
+		//mainCoroutine = StartCoroutine (IntroCoroutine ());
+		StartCoroutine (IntroCoroutine ());
 
 		int prefsHighStreak = PlayerPrefs.GetInt (KEY_HIGH_STREAK, 0);
 		GameManager.Instance.SetPointsThreshold(prefsHighStreak);
 	}
 
-	public void OnSpace()
+	public void OnTapBegin()
 	{
 		if (!isActive)
 			return;
@@ -47,19 +48,21 @@ public class MainController : Controller, InputManager.InputListener
 			Writer.setTextToStatusColor (1);
 			Writer.AddSpace ();
 		}
-		else 
-		{
-			isWaiting = false;
-			Writer.StopWriting();
-		}
 	}
 
-	public void OnDoubleSpace()
+	public void OnTapEnd()
+	{
+		if (!isActive)
+			return;
+
+		isWaiting = false;
+	}
+
+	public void OnTapLong()
 	{
 		Debug.Log ("Saved");
 		ParseObject testObject = new ParseObject("TestObject");
 		testObject["foo"] = "bar";
-		testObject.SaveAsync ();
 	}
 
 	private IEnumerator IntroCoroutine()
@@ -73,12 +76,12 @@ public class MainController : Controller, InputManager.InputListener
 		// intro message
 		if (GameManager.Instance.PointsThreshold == 0)
 		{
-			Writer.WriteText ("Hello.");
+			Writer.WriteText ("Hello.\nHold to view leaderboard");
 			yield return StartCoroutine (WaitForSecondsOrBreak (3f));
 		}
 		else
 		{
-			Writer.WriteText("Highest: " + GameManager.Instance.PointsThreshold);
+			Writer.WriteText("Highest: " + GameManager.Instance.PointsThreshold + "\nHold to view leaderboard");
 			yield return StartCoroutine (WaitForSecondsOrBreak (3f));
 		}
 
@@ -170,7 +173,8 @@ public class MainController : Controller, InputManager.InputListener
 				Writer.WriteText("Streak: " + GameManager.Instance.Points + 
 				                 "\nHighest: " + GameManager.Instance.PointsThreshold + 
 				                 "\nTap the SPACE to continue" +
-				                 "\nDouble Tap the SPACE to add to the leaderboard");
+				                 "\nHold to add to leaderboard");
+
 				GameManager.Instance.SetPoints(0);
 				yield return StartCoroutine(WaitForSecondsOrBreak(999999f));
 			}

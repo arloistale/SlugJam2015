@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 
 public class EntryController : Controller, InputManager.InputListener
@@ -12,7 +12,11 @@ public class EntryController : Controller, InputManager.InputListener
 		InputManager.Instance.SetInputListener (this);
 	}
 
-	public void OnSpace()
+	public void OnTapBegin()
+	{
+	}
+
+	public void OnTapEnd()
 	{
 		if (!isActive)
 			return;
@@ -20,7 +24,7 @@ public class EntryController : Controller, InputManager.InputListener
 		Go (GoLevelName);
 	}
 
-	public void OnDoubleSpace()
+	public void OnTapLong()
 	{
 	}
 
