@@ -6,7 +6,7 @@ public class Bootstrap : MonoBehaviour
 {
 	void Awake()
 	{
-		ParseObject.RegisterSubclass<Streak> ();
+		ParseObject.RegisterSubclass<ParseStreak> ();
 	}
 
 	void Start()

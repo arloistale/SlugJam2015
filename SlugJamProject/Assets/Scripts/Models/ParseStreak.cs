@@ -1,7 +1,7 @@
 ﻿using Parse;
 
 [ParseClassName("Streak")]
-public class Streak : ParseObject
+public class ParseStreak : ParseObject
 {
 	private const string KEY_DISPLAY_NAME = "DisplayName";
 	private const string KEY_STREAK_VALUE = "StreakValue";

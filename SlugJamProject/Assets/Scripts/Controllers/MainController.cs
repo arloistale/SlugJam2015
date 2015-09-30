@@ -7,6 +7,7 @@ using Parse;
 
 public class MainController : Controller, InputManager.InputListener
 {
+	// constants
 	private const string KEY_HIGH_STREAK = "High Streak";
 
 	private const float DURATION_STOP = 999999f;
@@ -63,8 +64,13 @@ public class MainController : Controller, InputManager.InputListener
 	public void OnTapHold()
 	{
 		Debug.Log ("Saved");
-		//ParseObject testObject = new ParseObject("TestObject");
-		//testObject["foo"] = "bar";
+	}
+
+	private void MakeStreak(string displayName, int value)
+	{
+		ParseStreak streak = ParseObject.Create<ParseStreak> ();
+		streak.DisplayName = displayName;
+		streak.StreakValue = value;
 	}
 
 	private IEnumerator LoadingCoroutine()

@@ -2,16 +2,12 @@
   <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
   <MonoDevelop.Ide.Workbench ActiveDocument="Assets/Scripts/Controllers/MainController.cs">
     <Files>
-      <File FileName="Assets/Scripts/Controllers/MainController.cs" Line="12" Column="46" />
-      <File FileName="Assets/link.xml" Line="1" Column="1" />
-      <File FileName="Assets/Scripts/Models/Streak.cs" Line="1" Column="1" />
-      <File FileName="Assets/Scripts/Models/Phrase.cs" Line="1" Column="1" />
-      <File FileName="Assets/Scripts/Internal/Bootstrap.cs" Line="1" Column="1" />
-      <File FileName="Assets/Standard Assets/CrossPlatformInput/Scripts/PlatformSpecific/MobileInput.cs" Line="1" Column="1" />
-      <File FileName="Assets/Scripts/Managers/InputManager.cs" Line="42" Column="27" />
-      <File FileName="Assets/Scripts/Managers/SoundManager.cs" Line="1" Column="1" />
+      <File FileName="Assets/Scripts/Utils/Gaussian.cs" Line="41" Column="3" />
+      <File FileName="Assets/Scripts/Managers/SoundManager.cs" Line="95" Column="34" />
       <File FileName="Assets/Scripts/Controllers/EntryController.cs" Line="1" Column="1" />
-      <File FileName="Assets/Scripts/Type/TypeWriter.cs" Line="18" Column="18" />
+      <File FileName="Assets/Scripts/Type/TypeWriter.cs" Line="1" Column="1" />
+      <File FileName="Assets/Scripts/Managers/InputManager.cs" Line="36" Column="3" />
+      <File FileName="Assets/Scripts/Controllers/MainController.cs" Line="23" Column="36" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.DebuggingService.Breakpoints>

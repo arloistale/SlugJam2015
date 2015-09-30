@@ -94,16 +94,8 @@ public class SoundManager : PersistentSingleton<SoundManager>
 		// we set the audio source volume to the one in parameters
 		audioSource.volume = SfxVolume;
 
-		// generate normal dist between 0 and 3
-		System.Random rand = new System.Random(); //reuse this if you are generating many
-		float u1 = (float) rand.NextDouble(); //these are uniform(0,1) random doubles
-		float u2 = (float) rand.NextDouble();
-		float randStdNormal = Mathf.Sqrt(-2.0f * Mathf.Log(u1)) *
-			Mathf.Sin(2.0f * Mathf.PI * u2); //random normal(0,1)
-		float randNormal =
-			1.25f + 1.0f * randStdNormal; //random normal(mean,stdDev^2)
-
-		audioSource.pitch = randNormal;
+		float randomNormalPitch = Gaussian.Next (1f, 3f);
+		audioSource.pitch = randomNormalPitch;
 		// we start playing the sound
 		audioSource.Play(); 
 		// we destroy the host after the clip has played
