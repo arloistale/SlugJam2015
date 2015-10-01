@@ -63,7 +63,10 @@ public class MainController : Controller, InputManager.InputListener
 
 	public void OnTapHold()
 	{
-		Debug.Log ("Saved");
+		if (!isActive)
+			return;
+
+		Writer.WriteTextInstant ("Tap Hold");
 	}
 
 	private void MakeStreak(string displayName, int value)
@@ -92,16 +95,16 @@ public class MainController : Controller, InputManager.InputListener
 		// intro message
 		if (GameManager.Instance.PointsThreshold == 0)
 		{
-			Writer.WriteText ("Hello.\nTap to continue\nHold to view leaderboard");
+			Writer.WriteText ("Hello.\n[Tap] to continue\n[Hold] for leaderboard");
 			yield return StartCoroutine (WaitForSecondsOrBreak (DURATION_STOP));
 		}
 		else
 		{
-			Writer.WriteText("Highest: " + GameManager.Instance.PointsThreshold + "\nTap to continue\nHold to view leaderboard");
+			Writer.WriteText("Highest: " + GameManager.Instance.PointsThreshold + "\n[Tap] to continue\n[Hold] for leaderboard");
 			yield return StartCoroutine (WaitForSecondsOrBreak (DURATION_STOP));
 		}
 
-		string instructionsMessage = "Tap to add SPACE between words as they are typed";
+		string instructionsMessage = "[Tap] to add SPACE between words as they are typed";
 
 		Writer.SetMode (TypeWriter.WriterMode.Normal);
 		Writer.WriteText (instructionsMessage);
@@ -188,8 +191,8 @@ public class MainController : Controller, InputManager.InputListener
 
 				Writer.WriteText("Streak: " + GameManager.Instance.Points + 
 				                 "\nHighest: " + GameManager.Instance.PointsThreshold + 
-				                 "\nTap to retry" +
-				                 "\nHold to add to leaderboard");
+				                 "\n[Tap] to retry" +
+				                 "\n[Hold] for leaderboard options");
 
 				GameManager.Instance.SetPoints(0);
 				yield return StartCoroutine(WaitForSecondsOrBreak(DURATION_STOP));
