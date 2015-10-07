@@ -7,10 +7,21 @@ using Parse;
 
 public class MainController : Controller, InputManager.InputListener
 {
+	public enum PendingState
+	{
+		Neutral,
+		Listening,
+		Tap,
+		Hold
+	}
+
 	// constants
 	private const string KEY_HIGH_STREAK = "High Streak";
 
 	private const float DURATION_STOP = 999999f;
+
+	private const int LEADERBOARD_INTENT_OPTIONS = 1;
+	private const int LEADERBOARD_INTENT_VIEW = 2;
 
 	// type data
 	public TypeWriter Writer;
@@ -22,8 +33,7 @@ public class MainController : Controller, InputManager.InputListener
 	private Coroutine waitCoroutine;
 	//private Coroutine mainCoroutine;
 
-	// internal data
-	private bool isWaiting;
+	private PendingState lastState;
 
 	protected override void Awake()
 	{
@@ -34,14 +44,14 @@ public class MainController : Controller, InputManager.InputListener
 
 	private void Start()
 	{
-		//mainCoroutine = StartCoroutine (IntroCoroutine ());
-		StartCoroutine (MainCoroutine ());
-
 		int prefsHighStreak = PlayerPrefs.GetInt (KEY_HIGH_STREAK, 0);
 		GameManager.Instance.SetPointsThreshold(prefsHighStreak);
+
+		//mainCoroutine = StartCoroutine (IntroCoroutine ());
+		StartCoroutine (MainCoroutine ());
 	}
 
-	public void OnTapBegin()
+	public void OnTouchBegin()
 	{
 		if (!isActive)
 			return;
@@ -53,27 +63,20 @@ public class MainController : Controller, InputManager.InputListener
 		}
 	}
 
-	public void OnTapEnd()
+	public void OnTap()
 	{
 		if (!isActive)
 			return;
 
-		isWaiting = false;
+		lastState = PendingState.Tap;
 	}
 
-	public void OnTapHold()
+	public void OnHold()
 	{
 		if (!isActive)
 			return;
 
-		Writer.WriteTextInstant ("Tap Hold");
-	}
-
-	private void MakeStreak(string displayName, int value)
-	{
-		ParseStreak streak = ParseObject.Create<ParseStreak> ();
-		streak.DisplayName = displayName;
-		streak.StreakValue = value;
+		lastState = PendingState.Hold;
 	}
 
 	private IEnumerator LoadingCoroutine()
@@ -93,17 +96,20 @@ public class MainController : Controller, InputManager.InputListener
 		Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
 
 		// intro message
-		if (GameManager.Instance.PointsThreshold == 0)
+		string greetingMessage = (GameManager.Instance.PointsThreshold > 0) ? 
+			("Highest: " + GameManager.Instance.PointsThreshold) : ("Hello.");
+
+		Writer.WriteText (greetingMessage + "\n[Tap] to continue\n[Hold] for leaderboard");
+		yield return StartCoroutine (WaitForHoldOrBreak ());
+
+		if(lastState == PendingState.Hold)
 		{
-			Writer.WriteText ("Hello.\n[Tap] to continue\n[Hold] for leaderboard");
-			yield return StartCoroutine (WaitForSecondsOrBreak (DURATION_STOP));
-		}
-		else
-		{
-			Writer.WriteText("Highest: " + GameManager.Instance.PointsThreshold + "\n[Tap] to continue\n[Hold] for leaderboard");
-			yield return StartCoroutine (WaitForSecondsOrBreak (DURATION_STOP));
+			Writer.WriteText("Starting up leaderboard");
+			
+			yield return StartCoroutine(WaitForSecondsOrBreak(DURATION_STOP));
 		}
 
+		// instructions message
 		string instructionsMessage = "[Tap] to add SPACE between words as they are typed";
 
 		Writer.SetMode (TypeWriter.WriterMode.Normal);
@@ -194,24 +200,66 @@ public class MainController : Controller, InputManager.InputListener
 				                 "\n[Tap] to retry" +
 				                 "\n[Hold] for leaderboard options");
 
+				yield return StartCoroutine(WaitForHoldOrBreak());
+
+				// time for a leaderboard?
+				if(lastState == PendingState.Hold)
+				{
+					Writer.WriteText("Leaderboard Options\n" +
+					                 "[Tap] to view\n" +
+					                 "[Hold] to add\n" +
+					                 "New streak: " + GameManager.Instance.Points + "\n");
+
+					yield return StartCoroutine(WaitForHoldOrBreak());
+
+					if(lastState == PendingState.Hold)
+					{
+						yield return StartCoroutine(MakeStreakCoroutine());
+					}
+				}
+
 				GameManager.Instance.SetPoints(0);
-				yield return StartCoroutine(WaitForSecondsOrBreak(DURATION_STOP));
 			}
 		}
 	}
 
+	private IEnumerator MakeStreakCoroutine()
+	{
+		int streakValue = GameManager.Instance.Points;
+
+		Writer.WriteText("Streak: " + streakValue + "\n" +
+		                 "[Tap] to cancel\n" +
+		                 "[Hold] to submit\n" +
+		                 "Enter name");
+
+		yield return StartCoroutine (WaitForHoldOrBreak ());
+
+		//ParseStreak streak = ParseObject.Create<ParseStreak> ();
+		//streak.DisplayName = displayName;
+		//streak.StreakValue = streakValue
+	}
+
 	private IEnumerator WaitForSecondsOrBreak(float duration)
 	{
-		isWaiting = true;
+		lastState = PendingState.Listening;
 		DateTime startTime = System.DateTime.UtcNow;
 		TimeSpan waitDuration = TimeSpan.FromSeconds(duration);
-		while (isWaiting)
+		while (lastState != PendingState.Tap && lastState != PendingState.Neutral)
 		{
 			if(System.DateTime.UtcNow - startTime >= waitDuration)
 			{
-				isWaiting = false;
+				lastState = PendingState.Neutral;
 			}
 
+			yield return null;
+		}
+	}
+
+	private IEnumerator WaitForHoldOrBreak()
+	{
+		lastState = PendingState.Listening;
+		while(lastState != PendingState.Hold && lastState != PendingState.Neutral && lastState != PendingState.Tap)
+		{
 			yield return null;
 		}
 	}

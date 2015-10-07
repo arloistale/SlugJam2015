@@ -68,6 +68,16 @@ public class TypeWriter : MonoBehaviour
 		typeCoroutine = StartCoroutine (WriteTextCoroutine ());
 	}
 
+	public void AppendText(string message)
+	{
+		typeMessage = message;
+
+		if (typeCoroutine != null)
+			StopCoroutine (typeCoroutine);
+
+		typeCoroutine = StartCoroutine (WriteTextCoroutine ());
+	}
+
 	public void ClearWriting()
 	{
 		TypeText.text = "";

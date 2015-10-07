@@ -1,11 +1,12 @@
 fileFormatVersion: 2
 guid: 18f2a366ea2eb448e997b5b33e3112ca
-timeCreated: 1443456181
+timeCreated: 1444180567
 licenseType: Free
 PluginImporter:
   serializedVersion: 1
   iconMap: {}
-  executionOrder: {}
+  executionOrder:
+    Parse.ParseInitializeBehaviour: -100
   isPreloaded: 0
   platformData:
     Any:

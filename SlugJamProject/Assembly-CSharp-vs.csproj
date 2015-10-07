@@ -48,6 +48,8 @@
   <ItemGroup>
      <Compile Include="Assets\Scripts\Controllers\Controller.cs" />
      <Compile Include="Assets\Scripts\Controllers\EntryController.cs" />
+     <Compile Include="Assets\Scripts\Controllers\LeaderboardController.cs" />
+     <Compile Include="Assets\Scripts\Controllers\LoginController.cs" />
      <Compile Include="Assets\Scripts\Controllers\MainController.cs" />
      <Compile Include="Assets\Scripts\Internal\Bootstrap.cs" />
      <Compile Include="Assets\Scripts\Internal\PersistentSingleton.cs" />

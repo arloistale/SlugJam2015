@@ -15,8 +15,9 @@ public class InputManager : PersistentSingleton<InputManager>
 	/// </summary>
 	private static InputListener inputListener;
 
-	// coroutine data
-	private Coroutine holdCoroutine;
+	private bool isHolding;
+	private bool didExpendHold;
+	private float holdDuration;
 	
 	/// <summary>
 	/// At update, we check the various commands and send them to the input listener.
@@ -24,24 +25,31 @@ public class InputManager : PersistentSingleton<InputManager>
 	void Update()
 	{
 		// assert that there is an input listener
-		if (inputListener == null) 
+		if (inputListener == null)
 		{
 			return;
 		}
 
+		if (isHolding) 
+		{
+			if (!didExpendHold && holdDuration >= DURATION_HOLD) 
+			{
+				didExpendHold = true;
+				inputListener.OnHold ();
+			}
+
+			holdDuration += Time.deltaTime;
+		}
+
 		if (CrossPlatformInputManager.GetButtonDown ("Space")) 
 		{
-			inputListener.OnTapBegin ();
+			if(!isHolding)
+				OnTouchBegin();
 		}
-
-		if (CrossPlatformInputManager.GetButtonUp ("Space")) 
+		else if (CrossPlatformInputManager.GetButtonUp ("Space")) 
 		{
-			inputListener.OnTapEnd();
-		}
-
-		if (CrossPlatformInputManager.GetButtonDown ("Submit")) 
-		{
-			inputListener.OnTapHold();
+			if(isHolding)
+				OnTouchEnd();
 		}
 
 		if(Input.touchCount > 0)
@@ -51,47 +59,56 @@ public class InputManager : PersistentSingleton<InputManager>
 			{
 				if(mainTouch.phase == TouchPhase.Began)
 				{
-					inputListener.OnTapBegin();
-
-					holdCoroutine = StartCoroutine(HoldCoroutine());
+					if(!isHolding)
+						OnTouchBegin();
 				}
 				else if(mainTouch.phase == TouchPhase.Ended)
 				{
-					inputListener.OnTapEnd();
-
-					if(holdCoroutine != null)
-						StopCoroutine(holdCoroutine);
+					if(isHolding)
+						OnTouchEnd();
 				}
 			}
 		}
+	}
+
+	private void OnTouchBegin()
+	{
+		didExpendHold = false;
+		isHolding = true;
+		inputListener.OnTouchBegin ();
+	}
+
+	private void OnTouchEnd()
+	{
+		isHolding = false;
+		
+		if(holdDuration < DURATION_HOLD)
+		{
+			inputListener.OnTap();
+		}
+
+		holdDuration = 0f;
 	}
 
 	/// <summary>
 	/// Sets the input listener.
 	/// </summary>
 	/// <param name="listener">Listener.</param>
-	public void SetInputListener(InputListener listener) {
-		inputListener = listener;
-	}
-
-	private IEnumerator HoldCoroutine()
+	public void SetInputListener(InputListener listener) 
 	{
-		yield return new WaitForSeconds (DURATION_HOLD);
-
-		Debug.Log ("Calling hold!");
-		inputListener.OnTapHold ();
+		inputListener = listener;
 	}
 
 	/// Interface between input commands and actions.
 	public interface InputListener
 	{
-		// when tap begins
-		void OnTapBegin();
+		// when touch begins, always called
+		void OnTouchBegin();
 
-		// when tap ends
-		void OnTapEnd();
+		// when tapped, only called if held less than HOLD_DURATION time
+		void OnTap();
 
-		// when SPACE action is double tapped
-		void OnTapHold();
+		// called when held time exceeds HOLD_DURATION time
+		void OnHold();
 	}
 }
