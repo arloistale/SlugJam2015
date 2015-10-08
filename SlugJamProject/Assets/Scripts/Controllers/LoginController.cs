@@ -23,18 +23,26 @@ public class LoginController : Controller, InputManager.InputListener
 	{
 		Unknown,
 		ParseInternal,
-		Connection,
-		LoginCancel,
-		LoginValidation
+		ParseException,
+		LoginCancel
 	}
-	
-	private static Dictionary<ErrorType, string> errorMap = new Dictionary<ErrorType, string>() 
+
+	private Dictionary<ParseException.ErrorCode, string> parseExceptionMap = new Dictionary<ParseException.ErrorCode, string>() 
 	{
-		{ ErrorType.Unknown, "Unknown error" },
-		{ ErrorType.ParseInternal, "Server error" },
-		{ ErrorType.Connection, "Bad connection" },
-		{ ErrorType.LoginCancel, "Cancelled" },
-		{ ErrorType.LoginValidation, "Wrong credentials" }
+		{ ParseException.ErrorCode.ConnectionFailed, "Bad connection" },
+		{ ParseException.ErrorCode.InternalServerError, "Server error" },
+		{ ParseException.ErrorCode.InvalidACL, "Server error" },
+		{ ParseException.ErrorCode.InvalidSessionToken, "Invalid session" },
+		{ ParseException.ErrorCode.MissingObjectId, "User error" },
+		{ ParseException.ErrorCode.NotInitialized, "User error" },
+		{ ParseException.ErrorCode.ObjectNotFound, "Wrong credentials" },
+		{ ParseException.ErrorCode.OperationForbidden, "Server error" },
+		{ ParseException.ErrorCode.OtherCause, "Unknown server error" },
+		{ ParseException.ErrorCode.RequestLimitExceeded, "Server limits reached" },
+		{ ParseException.ErrorCode.SessionMissing, "User error" },
+		{ ParseException.ErrorCode.Timeout, "Bad connection" },
+		{ ParseException.ErrorCode.UsernameTaken, "Username already taken" },
+		{ ParseException.ErrorCode.ValidationFailed, "Wrong credentials" }
 	};
 
 	// type data
@@ -54,7 +62,7 @@ public class LoginController : Controller, InputManager.InputListener
 	// internal
 	private LoginState loginState;
 	private ErrorType currentErrorType;
-	private ParseException currentUnknownException;
+	private ParseException.ErrorCode currentErrorCode;
 
 	private string currUsernameStr;
 
@@ -67,14 +75,6 @@ public class LoginController : Controller, InputManager.InputListener
 
 	private void Start()
 	{
-		InputField.SubmitEvent submitEventUsername = new InputField.SubmitEvent ();
-		submitEventUsername.AddListener (SubmitUsername);
-		UsernameField.onEndEdit = submitEventUsername;
-
-		InputField.SubmitEvent submitEventPassword = new InputField.SubmitEvent ();
-		submitEventPassword.AddListener (SubmitPasswordAuth);
-		PasswordField.onEndEdit = submitEventPassword;
-
 		PromptUsername ();
 	}
 
@@ -168,7 +168,7 @@ public class LoginController : Controller, InputManager.InputListener
 		UsernameCanvasGroup.interactable = false;
 
 		Writer.ClearWriting ();
-		AsyncWriter.WriteTextInstant (currUsernameStr + " | " + passwordStr);
+		AsyncWriter.RepeatText ("...");
 
 		ParseUser.LogInAsync (currUsernameStr, passwordStr).ContinueWith (t => {
 			if (t.IsFaulted)
@@ -176,23 +176,8 @@ public class LoginController : Controller, InputManager.InputListener
 				if (t.Exception.InnerExceptions.Count > 0 && t.Exception.InnerExceptions [0] is ParseException) 
 				{
 					ParseException parseException = (ParseException) t.Exception.InnerExceptions [0];
-					switch (parseException.Code) 
-					{
-						case ParseException.ErrorCode.ConnectionFailed:
-						case ParseException.ErrorCode.Timeout:
-							currentErrorType = ErrorType.Connection;
-							break;
-						case ParseException.ErrorCode.InternalServerError:
-							currentErrorType = ErrorType.ParseInternal;
-							break;
-						case ParseException.ErrorCode.ValidationFailed:
-							currentErrorType = ErrorType.LoginValidation;
-							break;
-						default:
-							currentErrorType = ErrorType.Unknown;
-							currentUnknownException = parseException;
-							break;
-					}
+					currentErrorCode = parseException.Code;
+					currentErrorType = ErrorType.ParseException;
 				}
 				else
 				{
@@ -237,23 +222,8 @@ public class LoginController : Controller, InputManager.InputListener
 				if (t.Exception.InnerExceptions.Count > 0 && t.Exception.InnerExceptions [0] is ParseException) 
 				{
 					ParseException parseException = (ParseException)t.Exception.InnerExceptions [0];
-					switch (parseException.Code) 
-					{
-					case ParseException.ErrorCode.ConnectionFailed:
-					case ParseException.ErrorCode.Timeout:
-						currentErrorType = ErrorType.Connection;
-						break;
-					case ParseException.ErrorCode.InternalServerError:
-						currentErrorType = ErrorType.ParseInternal;
-						break;
-					case ParseException.ErrorCode.ValidationFailed:
-						currentErrorType = ErrorType.LoginValidation;
-						break;
-					default:
-						currentErrorType = ErrorType.Unknown;
-						currentUnknownException = parseException;
-						break;
-					}
+					currentErrorCode = parseException.Code;
+					currentErrorType = ErrorType.ParseException;
 				}
 				else
 				{
@@ -287,17 +257,24 @@ public class LoginController : Controller, InputManager.InputListener
 			GoToLevel (GoLevelName);
 		else if (loginState == LoginState.Error)
 		{
-			if(currentErrorType != ErrorType.Unknown)
+			string errorStr = "Unknown error";
+
+			switch(currentErrorType)
 			{
-				AsyncWriter.WriteTextInstant(errorMap[currentErrorType] + "\n" +
-				                             "[Tap] to return\n");
+				case ErrorType.ParseInternal:
+					errorStr = "Server error";
+					break;
+				case ErrorType.ParseException:
+					if(parseExceptionMap.ContainsKey(currentErrorCode))
+						errorStr = parseExceptionMap[currentErrorCode];
+					break;
+				case ErrorType.LoginCancel:
+					errorStr = "Cancelled";
+					break;
 			}
-			else
-			{
-				AsyncWriter.WriteTextInstant(errorMap[currentErrorType] + "\n" + 
-				                             currentUnknownException.Code + ": " + currentUnknownException.Message + "\n" +
-				                             "[Tap] to return\n");
-			}
+
+			AsyncWriter.WriteTextInstant(errorStr + "\n" +
+			                             "[Tap] to return\n");
 		}
 	}
 

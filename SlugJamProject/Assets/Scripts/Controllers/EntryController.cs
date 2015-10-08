@@ -30,27 +30,7 @@ public class EntryController : Controller, InputManager.InputListener
 
 	private void Start()
 	{
-		if (ParseUser.CurrentUser != null) 
-		{
-			entryState = EntryState.LoggedIn;
-		} 
-		else 
-		{
-			entryState = EntryState.Normal;
-		}
-
-		switch(entryState)
-		{
-			case EntryState.LoggedIn:
-				Writer.WriteTextInstant ("Logged in as " + ParseUser.CurrentUser.Username + "\n"+
-				                         "[Tap] to play\n" +
-				                         "[Hold] to logout\n");
-				break;
-			case EntryState.Normal:
-				Writer.WriteTextInstant ("[Tap] to play offline\n" +
-				                         "[Hold] to login or signup\n");
-				break;
-		}
+		PromptEntry ();
 	}
 	
 	public void OnTouchBegin()
@@ -74,11 +54,37 @@ public class EntryController : Controller, InputManager.InputListener
 		{
 			case EntryState.LoggedIn:
 				ParseUser.LogOut();
-				Debug.Log (ParseUser.CurrentUser);
+				PromptEntry();
+				
 				break;
 			case EntryState.Normal:
 				StartCoroutine (GoToLevelCoroutine(LoginLevelName));
 			break;
+		}
+	}
+
+	private void PromptEntry()
+	{
+		if (ParseUser.CurrentUser != null) 
+		{
+			entryState = EntryState.LoggedIn;
+		} 
+		else 
+		{
+			entryState = EntryState.Normal;
+		}
+		
+		switch(entryState)
+		{
+			case EntryState.LoggedIn:
+				Writer.WriteTextInstant ("Logged in as " + ParseUser.CurrentUser.Username + "\n"+
+				                         "[Tap] to play\n" +
+				                         "[Hold] to logout\n");
+				break;
+			case EntryState.Normal:
+				Writer.WriteTextInstant ("[Tap] to play offline\n" +
+				                         "[Hold] to login or signup\n");
+				break;
 		}
 	}
 

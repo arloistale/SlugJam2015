@@ -71,6 +71,11 @@ public class InputManager : PersistentSingleton<InputManager>
 		}
 	}
 
+	public void EmulateTouchBegin()
+	{
+		OnTouchBegin ();
+	}
+
 	private void OnTouchBegin()
 	{
 		didExpendHold = false;
