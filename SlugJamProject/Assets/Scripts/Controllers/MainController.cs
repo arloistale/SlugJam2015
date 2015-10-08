@@ -58,7 +58,7 @@ public class MainController : Controller, InputManager.InputListener
 
 		if (Writer.GetMode () == TypeWriter.WriterMode.CullSpaces && Writer.isWriting) 
 		{
-			Writer.setTextToStatusColor (1);
+			Writer.SetTextStatusColor (TypeWriter.TypeStatus.Success);
 			Writer.AddSpace ();
 		}
 	}
@@ -158,7 +158,7 @@ public class MainController : Controller, InputManager.InputListener
 					if(errorSound != null)
 						SoundManager.Instance.PlaySound(errorSound, transform.position);
 
-					Writer.setTextToStatusColor(2);
+					Writer.SetTextStatusColor(TypeWriter.TypeStatus.Error);
 					Writer.StopWriting();
 					writeResult = false;
 				}

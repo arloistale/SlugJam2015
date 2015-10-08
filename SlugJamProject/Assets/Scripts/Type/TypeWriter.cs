@@ -10,6 +10,13 @@ public class TypeWriter : MonoBehaviour
 		CullSpaces
 	}
 
+	public enum TypeStatus
+	{
+		Normal,
+		Success,
+		Error
+	}
+
 	// constants
 	public const float TYPE_DURATION_SHORT = 0.05f;
 	public const float TYPE_DURATION_LONG = 0.5f;
@@ -29,8 +36,6 @@ public class TypeWriter : MonoBehaviour
 	private WriterMode writerMode;
 
 	private float typePauseDuration = 0.2f;
-	private string typeMessage;
-	private int typeIndex;
 
 	public bool isWriting { get; private set; }
 
@@ -60,22 +65,21 @@ public class TypeWriter : MonoBehaviour
 	public void WriteText(string message)
 	{
 		TypeText.text = "";
-		typeMessage = message;
 
 		if (typeCoroutine != null)
 			StopCoroutine (typeCoroutine);
 
-		typeCoroutine = StartCoroutine (WriteTextCoroutine ());
+		typeCoroutine = StartCoroutine (WriteTextCoroutine (message));
 	}
 
-	public void AppendText(string message)
+	public void RepeatText(string message)
 	{
-		typeMessage = message;
-
+		TypeText.text = "";
+		
 		if (typeCoroutine != null)
 			StopCoroutine (typeCoroutine);
-
-		typeCoroutine = StartCoroutine (WriteTextCoroutine ());
+		
+		typeCoroutine = StartCoroutine (RepeatTextCoroutine (message));
 	}
 
 	public void ClearWriting()
@@ -88,7 +92,6 @@ public class TypeWriter : MonoBehaviour
 		if (typeCoroutine != null)
 			StopCoroutine (typeCoroutine);
 
-		typeMessage = null;
 		isWriting = false;
 	}
 
@@ -110,29 +113,36 @@ public class TypeWriter : MonoBehaviour
 		typePauseDuration = duration;
 	}
 
-	public void setTextToStatusColor(int status)
+	public void SetTextStatusColor(TypeStatus status)
 	{
-		if (status == 0)
-			TypeText.color = Color.black;
-		if (status == 1) 
-			TypeText.color = Color.green;
-		if (status == 2) 
-			TypeText.color = Color.red;
+		switch (status) 
+		{
+			case TypeStatus.Normal:
+				TypeText.color = Color.black;
+				break;
+			case TypeStatus.Success:
+				TypeText.color = Color.green;
+				break;
+			case TypeStatus.Error:
+				TypeText.color = Color.red;
+				break;
+		}
 	}
 
-	private IEnumerator WriteTextCoroutine () 
+	private IEnumerator WriteTextCoroutine (string typeMessage) 
 	{
-		typeIndex = 0;
+		int typeIndex = 0;
 		char[] typeMessageChars = typeMessage.ToCharArray ();
 
 		isWriting = true;
 
-		for (; typeIndex < typeMessageChars.Length; typeIndex++) {
+		for (; typeIndex < typeMessageChars.Length; typeIndex++) 
+		{
 			char letter = typeMessageChars [typeIndex];
 			if (letter != ' ' || writerMode == WriterMode.Normal)
 			{
 				TypeText.text += letter;
-				setTextToStatusColor(0);
+				SetTextStatusColor(TypeStatus.Normal);
 			}
 
 			if (TypeSounds != null) 
@@ -145,5 +155,42 @@ public class TypeWriter : MonoBehaviour
 		}
 
 		isWriting = false;
+	}
+
+	private IEnumerator RepeatTextCoroutine (string typeMessage) 
+	{
+		int typeIndex;
+		char[] typeMessageChars = typeMessage.ToCharArray ();
+		
+		isWriting = true;
+		
+		while (isWriting) 
+		{
+			typeIndex = 0;
+
+			for (; typeIndex < typeMessageChars.Length; typeIndex++)
+			{
+				char letter = typeMessageChars [typeIndex];
+				if (letter != ' ' || writerMode == WriterMode.Normal)
+				{
+					TypeText.text += letter;
+					SetTextStatusColor(TypeStatus.Normal);
+				}
+				
+				if (TypeSounds != null) 
+				{
+					int soundIndex = Random.Range (0, TypeSounds.Length);
+					SoundManager.Instance.PlaySound (TypeSounds [soundIndex], transform.position);
+				}
+				
+				yield return new WaitForSeconds (typePauseDuration);
+			}
+
+			yield return new WaitForSeconds (typePauseDuration);
+
+			ClearWriting();
+
+			yield return new WaitForSeconds (typePauseDuration);
+		}
 	}
 }
