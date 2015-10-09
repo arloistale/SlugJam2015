@@ -1,0 +1,10 @@
+{
+  "applications": {
+    "Space": {
+      "applicationId": "rCGs9ZcFR4XyCWwwHMgqQGjJNmM0EjcBUdCMAiu7"
+    },
+    "_default": {
+      "link": "Space"
+    }
+  }
+}

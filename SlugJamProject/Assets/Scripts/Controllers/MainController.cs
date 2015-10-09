@@ -2,17 +2,27 @@
 using System;
 using System.Text.RegularExpressions;
 using System.Collections;
+using System.Collections.Generic;
+
+using System.Threading.Tasks;
 
 using Parse;
 
 public class MainController : Controller, InputManager.InputListener
 {
-	public enum PendingState
+	private enum PendingState
 	{
 		Neutral,
 		Listening,
 		Tap,
 		Hold
+	}
+
+	private enum ErrorType
+	{
+		Unknown,
+		ParseInternal,
+		ParseException
 	}
 
 	// constants
@@ -33,6 +43,7 @@ public class MainController : Controller, InputManager.InputListener
 	private Coroutine waitCoroutine;
 	//private Coroutine mainCoroutine;
 
+	// internal data
 	private PendingState lastState;
 
 	protected override void Awake()
@@ -44,10 +55,6 @@ public class MainController : Controller, InputManager.InputListener
 
 	private void Start()
 	{
-		int prefsHighStreak = PlayerPrefs.GetInt (KEY_HIGH_STREAK, 0);
-		GameManager.Instance.SetPointsThreshold(prefsHighStreak);
-
-		//mainCoroutine = StartCoroutine (IntroCoroutine ());
 		StartCoroutine (MainCoroutine ());
 	}
 
@@ -89,6 +96,15 @@ public class MainController : Controller, InputManager.InputListener
 
 	private IEnumerator MainCoroutine()
 	{
+		int prefsHighStreak = 0;
+
+		if (ParseUser.CurrentUser != null)
+			prefsHighStreak = ParseUser.CurrentUser.Get<int> (KEY_HIGH_STREAK);
+		else
+			prefsHighStreak = PlayerPrefs.GetInt (KEY_HIGH_STREAK, 0);
+
+		GameManager.Instance.SetPointsThreshold(prefsHighStreak);
+
 		GameManager.Instance.SetPoints (0);
 
 		yield return StartCoroutine (WaitForSecondsOrBreak (1f));
@@ -99,7 +115,7 @@ public class MainController : Controller, InputManager.InputListener
 		string greetingMessage = (GameManager.Instance.PointsThreshold > 0) ? 
 			("Highest: " + GameManager.Instance.PointsThreshold) : ("Hello.");
 
-		Writer.WriteText (greetingMessage + "\n[Tap] to continue\n[Hold] for leaderboard");
+		Writer.WriteTextInstant (greetingMessage + "\n[Tap] to continue\n[Hold] for leaderboard");
 		yield return StartCoroutine (WaitForHoldOrBreak ());
 
 		if(lastState == PendingState.Hold)
@@ -113,7 +129,7 @@ public class MainController : Controller, InputManager.InputListener
 		string instructionsMessage = "[Tap] to add SPACE between words as they are typed";
 
 		Writer.SetMode (TypeWriter.WriterMode.Normal);
-		Writer.WriteText (instructionsMessage);
+		Writer.WriteTextInstant (instructionsMessage);
 
 		yield return StartCoroutine(WaitForSecondsOrBreak(4f));
 
@@ -195,7 +211,7 @@ public class MainController : Controller, InputManager.InputListener
 					PlayerPrefs.Save();
 				}
 
-				Writer.WriteText("Streak: " + GameManager.Instance.Points + 
+				Writer.WriteTextInstant("Streak: " + GameManager.Instance.Points + 
 				                 "\nHighest: " + GameManager.Instance.PointsThreshold + 
 				                 "\n[Tap] to retry" +
 				                 "\n[Hold] for leaderboard options");
@@ -205,10 +221,10 @@ public class MainController : Controller, InputManager.InputListener
 				// time for a leaderboard?
 				if(lastState == PendingState.Hold)
 				{
-					Writer.WriteText("Leaderboard Options\n" +
+					Writer.WriteTextInstant("Leaderboard Options\n" +
 					                 "[Tap] to view\n" +
 					                 "[Hold] to add\n" +
-					                 "New streak: " + GameManager.Instance.Points + "\n");
+					                 "Highest: " + GameManager.Instance.Points + "\n");
 
 					yield return StartCoroutine(WaitForHoldOrBreak());
 
@@ -227,16 +243,45 @@ public class MainController : Controller, InputManager.InputListener
 	{
 		int streakValue = GameManager.Instance.Points;
 
-		Writer.WriteText("Streak: " + streakValue + "\n" +
-		                 "[Tap] to cancel\n" +
-		                 "[Hold] to submit\n" +
-		                 "Enter name");
+		ParseUser currentUser = ParseUser.CurrentUser;
+		currentUser.Add (KEY_HIGH_STREAK, streakValue);
 
-		yield return StartCoroutine (WaitForHoldOrBreak ());
+		Task saveTask = currentUser.SaveAsync ();
 
-		//ParseStreak streak = ParseObject.Create<ParseStreak> ();
-		//streak.DisplayName = displayName;
-		//streak.StreakValue = streakValue
+		while (!saveTask.IsCompleted) 
+		{
+			yield return null;
+		}
+
+		if (saveTask.IsFaulted || saveTask.IsCanceled)
+		{
+			string errorStr = "Unknown error";
+
+			using (IEnumerator<System.Exception> enumerator = saveTask.Exception.InnerExceptions.GetEnumerator()) 
+			{
+				if (enumerator.MoveNext()) 
+				{
+					ParseException exception = (ParseException) enumerator.Current;
+					if(MessageBook.ParseExceptionMap.ContainsKey(exception.Code))
+						errorStr = MessageBook.ParseExceptionMap[exception.Code];
+					else
+						errorStr = exception.Code + "";
+				}
+				else
+				{
+					errorStr = "Server error";
+				}
+			}
+
+			Writer.WriteTextInstant(errorStr + "\n" +
+			                             "[Tap] to return\n");
+
+			// wait for them to tap
+		}
+		else
+		{
+			// start up leaderboard controller
+		}
 	}
 
 	private IEnumerator WaitForSecondsOrBreak(float duration)

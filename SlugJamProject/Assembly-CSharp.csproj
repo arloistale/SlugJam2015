@@ -60,6 +60,7 @@
      <Compile Include="Assets\Scripts\Models\Phrase.cs" />
      <Compile Include="Assets\Scripts\Type\TypeWriter.cs" />
      <Compile Include="Assets\Scripts\Utils\Gaussian.cs" />
+     <Compile Include="Assets\Scripts\Utils\MessageBook.cs" />
      <None Include="Assets\Standard Assets\CrossPlatformInput\CrossPlatformInputGuidelines.txt" />
      <None Include="Assets\Parse\Parse.Unity.xml" />
      <None Include="Assets\link.xml" />

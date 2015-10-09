@@ -3,8 +3,8 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System.Collections;
 using System.Collections.Generic;
+using System;
 
-using System.Threading.Tasks;
 using Parse;
 
 public class LoginController : Controller, InputManager.InputListener
@@ -23,27 +23,8 @@ public class LoginController : Controller, InputManager.InputListener
 	{
 		Unknown,
 		ParseInternal,
-		ParseException,
-		LoginCancel
+		ParseException
 	}
-
-	private Dictionary<ParseException.ErrorCode, string> parseExceptionMap = new Dictionary<ParseException.ErrorCode, string>() 
-	{
-		{ ParseException.ErrorCode.ConnectionFailed, "Bad connection" },
-		{ ParseException.ErrorCode.InternalServerError, "Server error" },
-		{ ParseException.ErrorCode.InvalidACL, "Server error" },
-		{ ParseException.ErrorCode.InvalidSessionToken, "Invalid session" },
-		{ ParseException.ErrorCode.MissingObjectId, "User error" },
-		{ ParseException.ErrorCode.NotInitialized, "User error" },
-		{ ParseException.ErrorCode.ObjectNotFound, "Wrong credentials" },
-		{ ParseException.ErrorCode.OperationForbidden, "Server error" },
-		{ ParseException.ErrorCode.OtherCause, "Unknown server error" },
-		{ ParseException.ErrorCode.RequestLimitExceeded, "Server limits reached" },
-		{ ParseException.ErrorCode.SessionMissing, "User error" },
-		{ ParseException.ErrorCode.Timeout, "Bad connection" },
-		{ ParseException.ErrorCode.UsernameTaken, "Username already taken" },
-		{ ParseException.ErrorCode.ValidationFailed, "Wrong credentials" }
-	};
 
 	// type data
 	public TypeWriter Writer;
@@ -119,12 +100,22 @@ public class LoginController : Controller, InputManager.InputListener
 
 	private void PromptUsername()
 	{
+		AsyncWriter.ClearWriting ();
+
 		loginState = LoginState.Username;
+
 		Writer.WriteTextInstant ("[Tap] to continue\n" +
 		                         "[Hold] to cancel\n" +
 		                         "Enter username");
 
-		AsyncWriter.ClearWriting ();
+		PasswordCanvasGroup.alpha = 0;
+		PasswordCanvasGroup.blocksRaycasts = false;
+		PasswordCanvasGroup.interactable = false;
+		UsernameCanvasGroup.alpha = 1;
+		UsernameCanvasGroup.blocksRaycasts = true;
+		UsernameCanvasGroup.interactable = true;
+
+		UsernameField.text = "";
 		
 		EventSystem.current.SetSelectedGameObject(UsernameField.gameObject, null);
 	}
@@ -134,19 +125,22 @@ public class LoginController : Controller, InputManager.InputListener
 		AsyncWriter.ClearWriting ();
 
 		loginState = LoginState.Password;
+
+		Writer.WriteTextInstant ("Username: " + currUsernameStr + "\n" +
+		                         "[Tap] to login\n" +
+		                         "[Hold] to signup\n" +
+		                         "Enter password");
+
 		UsernameCanvasGroup.alpha = 0;
 		UsernameCanvasGroup.blocksRaycasts = false;
 		UsernameCanvasGroup.interactable = false;
 		PasswordCanvasGroup.alpha = 1;
 		PasswordCanvasGroup.blocksRaycasts = true;
 		PasswordCanvasGroup.interactable = true;
-		
+
+		PasswordField.text = "";
+
 		EventSystem.current.SetSelectedGameObject(PasswordField.gameObject, null);
-		
-		Writer.WriteTextInstant ("Username: " + currUsernameStr + "\n" +
-		                         "[Tap] to login\n" +
-		                         "[Hold] to signup\n" +
-		                         "Enter password");
 	}
 
 	private void SubmitUsername(string usernameStr)
@@ -154,7 +148,6 @@ public class LoginController : Controller, InputManager.InputListener
 		if (usernameStr.Length > 0) 
 		{
 			currUsernameStr = usernameStr;
-
 			PromptPassword();
 		}
 	}
@@ -164,31 +157,30 @@ public class LoginController : Controller, InputManager.InputListener
 		loginState = LoginState.Authing;
 
 		PasswordCanvasGroup.alpha = 0;
-		UsernameCanvasGroup.blocksRaycasts = false;
-		UsernameCanvasGroup.interactable = false;
+		PasswordCanvasGroup.blocksRaycasts = false;
+		PasswordCanvasGroup.interactable = false;
 
 		Writer.ClearWriting ();
 		AsyncWriter.RepeatText ("...");
 
-		ParseUser.LogInAsync (currUsernameStr, passwordStr).ContinueWith (t => {
-			if (t.IsFaulted)
+		ParseUser.LogInAsync (currUsernameStr, passwordStr).ContinueWith (t => 
+		{
+			if (t.IsFaulted || t.IsCanceled)
 			{
-				if (t.Exception.InnerExceptions.Count > 0 && t.Exception.InnerExceptions [0] is ParseException) 
+				using (IEnumerator<System.Exception> enumerator = t.Exception.InnerExceptions.GetEnumerator()) 
 				{
-					ParseException parseException = (ParseException) t.Exception.InnerExceptions [0];
-					currentErrorCode = parseException.Code;
-					currentErrorType = ErrorType.ParseException;
-				}
-				else
-				{
-					currentErrorType = ErrorType.ParseInternal;
+					if (enumerator.MoveNext()) 
+					{
+						ParseException exception = (ParseException) enumerator.Current;
+						currentErrorCode = exception.Code;
+						currentErrorType = ErrorType.ParseException;
+					}
+					else
+					{
+						currentErrorType = ErrorType.ParseInternal;
+					}
 				}
 				
-				loginState = LoginState.Error;
-			}
-			else if(t.IsCanceled)
-			{
-				currentErrorType = ErrorType.LoginCancel;
 				loginState = LoginState.Error;
 			}
 			else
@@ -204,42 +196,80 @@ public class LoginController : Controller, InputManager.InputListener
 	{
 		loginState = LoginState.Registering;
 
-		ParseUser newUser = new ParseUser ();
-		newUser.Username = currUsernameStr;
-		newUser.Password = passwordStr;
-
 		PasswordCanvasGroup.alpha = 0;
-		UsernameCanvasGroup.blocksRaycasts = false;
-		UsernameCanvasGroup.interactable = false;
+		PasswordCanvasGroup.blocksRaycasts = false;
+		PasswordCanvasGroup.interactable = false;
 
 		Writer.ClearWriting ();
 		AsyncWriter.RepeatText ("...");
 
-		newUser.SignUpAsync ().ContinueWith (t => {
-
-			if (t.IsFaulted)
+		IDictionary<string, object> userInfo = new Dictionary<string, object>
+		{
+			{ "username", currUsernameStr },
+			{ "password", passwordStr }
+		};
+		ParseCloud.CallFunctionAsync<IDictionary<string, object>>("SignUpCloud", userInfo).ContinueWith(t =>
+		{
+			if (t.IsFaulted || t.IsCanceled)
 			{
-				if (t.Exception.InnerExceptions.Count > 0 && t.Exception.InnerExceptions [0] is ParseException) 
+				using (IEnumerator<System.Exception> enumerator = t.Exception.InnerExceptions.GetEnumerator()) 
 				{
-					ParseException parseException = (ParseException)t.Exception.InnerExceptions [0];
-					currentErrorCode = parseException.Code;
+					if (enumerator.MoveNext()) 
+					{
+						ParseException exception = (ParseException) enumerator.Current;
+						currentErrorCode = exception.Code;
+						currentErrorType = ErrorType.ParseException;
+					}
+					else
+					{
+						currentErrorType = ErrorType.ParseInternal;
+					}
+				}
+
+				loginState = LoginState.Error;
+			} else {
+				IDictionary<string, object> result = t.Result;
+				// Hack, check for errors
+				object code;
+				if (result.TryGetValue("code", out code)) 
+				{
+					int errorCodeInt = Convert.ToInt32(code);
+					currentErrorCode = (ParseException.ErrorCode) errorCodeInt;
 					currentErrorType = ErrorType.ParseException;
+					loginState = LoginState.Error;
 				}
-				else
+				else 
 				{
-					currentErrorType = ErrorType.ParseInternal;
+					object token;
+					if(result.TryGetValue("token", out token))
+					{
+						ParseUser.BecomeAsync((string) token).ContinueWith(ti => 
+						{
+							if (ti.IsFaulted || ti.IsCanceled)
+							{
+								using (IEnumerator<System.Exception> enumerator = ti.Exception.InnerExceptions.GetEnumerator()) 
+								{
+									if (enumerator.MoveNext()) 
+									{
+										ParseException exception = (ParseException) enumerator.Current;
+										currentErrorCode = exception.Code;
+										currentErrorType = ErrorType.ParseException;
+									}
+									else
+									{
+										currentErrorType = ErrorType.ParseInternal;
+									}
+								}
+								
+								loginState = LoginState.Error;
+							} 
+							else 
+							{
+								loginState = LoginState.Ready;
+							}
+						});
+					}
 				}
-
-				loginState = LoginState.Error;
-			}
-			else if(t.IsCanceled)
-			{
-				currentErrorType = ErrorType.LoginCancel;
-				loginState = LoginState.Error;
-			}
-			else
-			{
-				loginState = LoginState.Ready;
 			}
 		});
 
@@ -265,11 +295,10 @@ public class LoginController : Controller, InputManager.InputListener
 					errorStr = "Server error";
 					break;
 				case ErrorType.ParseException:
-					if(parseExceptionMap.ContainsKey(currentErrorCode))
-						errorStr = parseExceptionMap[currentErrorCode];
-					break;
-				case ErrorType.LoginCancel:
-					errorStr = "Cancelled";
+					if(MessageBook.ParseExceptionMap.ContainsKey(currentErrorCode))
+						errorStr = MessageBook.ParseExceptionMap[currentErrorCode];
+					else
+						errorStr = currentErrorCode + "";
 					break;
 			}
 
