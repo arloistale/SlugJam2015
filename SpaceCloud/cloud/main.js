@@ -2,6 +2,7 @@ Parse.Cloud.define("SignUpCloud", function(request, response) {
   var user = new Parse.User();
   user.set("username", request.params.username);
   user.set("password", request.params.password);
+  user.set("streak", 0);
 
   user.signUp(null, {
     success: function(user) {

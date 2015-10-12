@@ -10,12 +10,13 @@ using Parse;
 
 public class MainController : Controller, InputManager.InputListener
 {
-	private enum PendingState
+	private enum MainState
 	{
-		Neutral,
-		Listening,
-		Tap,
-		Hold
+		Intro,
+		Instructions,
+		Game,
+		End,
+		SyncError
 	}
 
 	private enum ErrorType
@@ -25,13 +26,8 @@ public class MainController : Controller, InputManager.InputListener
 		ParseException
 	}
 
-	// constants
-	private const string KEY_HIGH_STREAK = "High Streak";
-
-	private const float DURATION_STOP = 999999f;
-
-	private const int LEADERBOARD_INTENT_OPTIONS = 1;
-	private const int LEADERBOARD_INTENT_VIEW = 2;
+	// leaderboad data
+	public LeaderboardController LeaderboardController;
 
 	// type data
 	public TypeWriter Writer;
@@ -39,12 +35,15 @@ public class MainController : Controller, InputManager.InputListener
 	public AudioClip errorSound;
 	public AudioClip successSound;
 
-	// coroutine data
-	private Coroutine waitCoroutine;
-	//private Coroutine mainCoroutine;
-
 	// internal data
-	private PendingState lastState;
+	private MainState lastState;
+	private MainState mainState;
+	private ErrorType currentErrorType;
+	private ParseException.ErrorCode currentErrorCode;
+
+	private bool isSyncing;
+
+	private bool didTap;
 
 	protected override void Awake()
 	{
@@ -55,12 +54,44 @@ public class MainController : Controller, InputManager.InputListener
 
 	private void Start()
 	{
-		StartCoroutine (MainCoroutine ());
+		// we always store the highscore in player prefs even when online
+		// here are the steps
+		// we first make sure we're online, then if we're online we check to make sure the
+		// locally cached user ID is the same as the current one
+		// if they're not the same that means a different account is logged in compared to the last cached one
+		// so we change the locally cached score to whatever the current user's score is
+		// and we also update the locally cached user ID to the new logged in user
+		//
+		// with this once a user logs in online then plays offline somehow the score
+		// will still be saved locally even offline so the user can still progress offline
+		// and the score will persist when the user logs back in
+		// but when a new account logs in the local score will be set to the new users score
+		int prefsOverallStreak = PlayerPrefs.GetInt (ParseUserUtils.KEY_STREAK, 0);
+
+		if (GameManager.Instance.IsOnline)
+		{
+			if(PlayerPrefs.GetString(ParseUserUtils.KEY_CACHED_ID) != ParseUser.CurrentUser.ObjectId)
+			{
+				int userOverallStreak = ParseUser.CurrentUser.Get<int> (ParseUserUtils.KEY_STREAK);
+				prefsOverallStreak = userOverallStreak;
+				PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, prefsOverallStreak);
+				PlayerPrefs.SetString(ParseUserUtils.KEY_CACHED_ID, ParseUser.CurrentUser.ObjectId);
+				PlayerPrefs.Save();
+			}
+			// if the user is the same as the before then the local score should be aligned
+			// with the user score
+		}
+
+		GameManager.Instance.SetPointsThreshold(prefsOverallStreak);
+		
+		GameManager.Instance.SetPoints (0);
+
+		PromptIntro ();
 	}
 
 	public void OnTouchBegin()
 	{
-		if (!isActive)
+		if (!isActive && !isSyncing && !LeaderboardController.IsActive())
 			return;
 
 		if (Writer.GetMode () == TypeWriter.WriterMode.CullSpaces && Writer.isWriting) 
@@ -72,83 +103,118 @@ public class MainController : Controller, InputManager.InputListener
 
 	public void OnTap()
 	{
-		if (!isActive)
+		if (!isActive && !isSyncing && !LeaderboardController.IsActive())
 			return;
 
-		lastState = PendingState.Tap;
+		didTap = true;
+
+		switch (mainState) 
+		{
+		case MainState.Intro:
+			PromptInstructions();
+			break;
+		case MainState.End:
+			PromptGame();
+			break;
+		case MainState.SyncError:
+			if(lastState == MainState.End)
+				PromptEnd();
+			else
+				PromptIntro();
+			break;
+		}
 	}
 
 	public void OnHold()
 	{
-		if (!isActive)
+		if (!isActive && !isSyncing && !LeaderboardController.IsActive())
 			return;
 
-		lastState = PendingState.Hold;
+		switch (mainState) 
+		{
+		case MainState.Intro:
+			StartCoroutine(LeaderboardCoroutine());
+			break;
+		case MainState.End:
+			StartCoroutine(LeaderboardCoroutine());
+			break;
+		}
 	}
 
-	private IEnumerator LoadingCoroutine()
+	private void PromptIntro()
 	{
-		Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_LONG);
-		Writer.WriteText ("...");
+		lastState = mainState;
+		mainState = MainState.Intro;
 
-		yield return null;
-	}
-
-	private IEnumerator MainCoroutine()
-	{
-		int prefsHighStreak = 0;
-
-		if (ParseUser.CurrentUser != null)
-			prefsHighStreak = ParseUser.CurrentUser.Get<int> (KEY_HIGH_STREAK);
-		else
-			prefsHighStreak = PlayerPrefs.GetInt (KEY_HIGH_STREAK, 0);
-
-		GameManager.Instance.SetPointsThreshold(prefsHighStreak);
-
-		GameManager.Instance.SetPoints (0);
-
-		yield return StartCoroutine (WaitForSecondsOrBreak (1f));
-
-		Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
-
-		// intro message
 		string greetingMessage = (GameManager.Instance.PointsThreshold > 0) ? 
 			("Highest: " + GameManager.Instance.PointsThreshold) : ("Hello.");
 
 		Writer.WriteTextInstant (greetingMessage + "\n[Tap] to continue\n[Hold] for leaderboard");
-		yield return StartCoroutine (WaitForHoldOrBreak ());
+	}
 
-		if(lastState == PendingState.Hold)
+	private void PromptInstructions()
+	{
+		lastState = mainState;
+		mainState = MainState.Instructions;
+
+		Writer.WriteTextInstant (MessageBook.InstructionsMessage);
+
+		StartCoroutine (InstructionsCoroutine ());
+	}
+
+	private void PromptGame()
+	{
+		lastState = mainState;
+		mainState = MainState.Game;
+
+		StartCoroutine (GameCoroutine ());
+	}
+
+	private void PromptEnd()
+	{
+		lastState = mainState;
+		mainState = MainState.End;
+
+		if(GameManager.Instance.Points > GameManager.Instance.PointsThreshold) 
 		{
-			Writer.WriteText("Starting up leaderboard");
-			
-			yield return StartCoroutine(WaitForSecondsOrBreak(DURATION_STOP));
+			GameManager.Instance.SetPointsThreshold(GameManager.Instance.Points);
+
+			PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, GameManager.Instance.PointsThreshold);
+			PlayerPrefs.Save();
 		}
+		
+		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Points +
+		                        "\nHighest: " + GameManager.Instance.PointsThreshold + 
+		                        "\n[Tap] to retry" +
+		                        "\n[Hold] for leaderboard");
+		
+		GameManager.Instance.SetPoints(0);
+	}
 
-		// instructions message
-		string instructionsMessage = "[Tap] to add SPACE between words as they are typed";
+	private IEnumerator InstructionsCoroutine()
+	{
+		yield return StartCoroutine (WaitForSecondsOrTap (4f));
+		
+		PromptGame ();
+	}
 
-		Writer.SetMode (TypeWriter.WriterMode.Normal);
-		Writer.WriteTextInstant (instructionsMessage);
-
-		yield return StartCoroutine(WaitForSecondsOrBreak(4f));
-
+	private IEnumerator GameCoroutine()
+	{
 		while (true) 
 		{
-			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
-
 			// get a random phrase and generate a raw message from the phrase
-			int phraseIndex = UnityEngine.Random.Range (0, Phrases.Length);
+			int phraseIndex = (GameManager.Instance.PointsThreshold > 0) ? UnityEngine.Random.Range (0, Phrases.Length) : 0;
 			Phrase randomPhrase = Phrases[phraseIndex];
 			string rawMessage = Regex.Replace(randomPhrase.correctMessage, @"\s+", "");
-			//Debug.Log (rawMessage + " | " + randomPhrase.correctMessage);
 			string correctMessage = randomPhrase.correctMessage;
 			int wordCount = randomPhrase.correctMessage.Split(' ').Length;
 
+			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
 			Writer.SetMode(TypeWriter.WriterMode.Normal);
-			Writer.WriteText (rawMessage + "\n" + wordCount + " words");
+			Writer.WriteText (rawMessage + "\n" + 
+			                  wordCount + " words\n");
 
-			yield return StartCoroutine(WaitForSecondsOrBreak(5f));
+			yield return StartCoroutine(WaitForSecondsOrTap(3f));
 		
 			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_MEDIUM);
 			
@@ -184,6 +250,7 @@ public class MainController : Controller, InputManager.InputListener
 
 			yield return new WaitForSeconds(1f);
 
+			Writer.SetTextStatusColor(TypeWriter.TypeStatus.Normal);
 			Writer.SetTypeDuration(TypeWriter.TYPE_DURATION_SHORT);
 			Writer.SetMode(TypeWriter.WriterMode.Normal);
 
@@ -195,56 +262,64 @@ public class MainController : Controller, InputManager.InputListener
 				GameManager.Instance.AddPoints(1);
 
 				if(GameManager.Instance.PointsThreshold > 0)
-					Writer.WriteText("Streak: " + GameManager.Instance.Points + "\nHighest: " + GameManager.Instance.PointsThreshold);
+					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Points + "\nHighest: " + GameManager.Instance.PointsThreshold);
 				else
-					Writer.WriteText("Streak: " + GameManager.Instance.Points);
+					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Points);
 
-				yield return StartCoroutine(WaitForSecondsOrBreak(3f));
+				yield return StartCoroutine(WaitForSecondsOrTap(3f));
 			}
 			else
 			{
-				if(GameManager.Instance.Points > GameManager.Instance.PointsThreshold) 
-				{
-					GameManager.Instance.SetPointsThreshold(GameManager.Instance.Points);
-
-					PlayerPrefs.SetInt(KEY_HIGH_STREAK, GameManager.Instance.PointsThreshold);
-					PlayerPrefs.Save();
-				}
-
-				Writer.WriteTextInstant("Streak: " + GameManager.Instance.Points + 
-				                 "\nHighest: " + GameManager.Instance.PointsThreshold + 
-				                 "\n[Tap] to retry" +
-				                 "\n[Hold] for leaderboard options");
-
-				yield return StartCoroutine(WaitForHoldOrBreak());
-
-				// time for a leaderboard?
-				if(lastState == PendingState.Hold)
-				{
-					Writer.WriteTextInstant("Leaderboard Options\n" +
-					                 "[Tap] to view\n" +
-					                 "[Hold] to add\n" +
-					                 "Highest: " + GameManager.Instance.Points + "\n");
-
-					yield return StartCoroutine(WaitForHoldOrBreak());
-
-					if(lastState == PendingState.Hold)
-					{
-						yield return StartCoroutine(MakeStreakCoroutine());
-					}
-				}
-
-				GameManager.Instance.SetPoints(0);
+				PromptEnd();
+				break;
 			}
 		}
 	}
 
-	private IEnumerator MakeStreakCoroutine()
+	private IEnumerator LeaderboardCoroutine()
 	{
-		int streakValue = GameManager.Instance.Points;
+		if (ShouldSyncOverall())
+		{
+			yield return StartCoroutine (SyncCoroutine ());
+
+			if (mainState == MainState.SyncError)
+			{
+				string errorStr = "Unknown error";
+				
+				switch(currentErrorType)
+				{
+				case ErrorType.ParseInternal:
+					errorStr = "Server error";
+					break;
+				case ErrorType.ParseException:
+					if(MessageBook.ParseExceptionMap.ContainsKey(currentErrorCode))
+						errorStr = MessageBook.ParseExceptionMap[currentErrorCode];
+					else
+						errorStr = currentErrorCode + "";
+					break;
+				}
+				
+				Writer.WriteTextInstant("Sync error\n" +
+				                        errorStr + "\n" +
+				                        "[Tap] to return\n");
+
+				yield break;
+			}
+		}
+		
+		LeaderboardController.Activate ();
+	}
+
+	private IEnumerator SyncCoroutine()
+	{
+		isSyncing = true;
+
+		Writer.WriteTextInstant("Syncing...");
+
+		int streakValue = GameManager.Instance.PointsThreshold;
 
 		ParseUser currentUser = ParseUser.CurrentUser;
-		currentUser.Add (KEY_HIGH_STREAK, streakValue);
+		currentUser[ParseUserUtils.KEY_STREAK] = streakValue;
 
 		Task saveTask = currentUser.SaveAsync ();
 
@@ -255,57 +330,62 @@ public class MainController : Controller, InputManager.InputListener
 
 		if (saveTask.IsFaulted || saveTask.IsCanceled)
 		{
-			string errorStr = "Unknown error";
-
 			using (IEnumerator<System.Exception> enumerator = saveTask.Exception.InnerExceptions.GetEnumerator()) 
 			{
 				if (enumerator.MoveNext()) 
 				{
 					ParseException exception = (ParseException) enumerator.Current;
-					if(MessageBook.ParseExceptionMap.ContainsKey(exception.Code))
-						errorStr = MessageBook.ParseExceptionMap[exception.Code];
-					else
-						errorStr = exception.Code + "";
+					currentErrorCode = exception.Code;
+					currentErrorType = ErrorType.ParseException;
 				}
 				else
 				{
-					errorStr = "Server error";
+					currentErrorType = ErrorType.ParseInternal;
 				}
 			}
 
-			Writer.WriteTextInstant(errorStr + "\n" +
-			                             "[Tap] to return\n");
+			lastState = mainState;
+			mainState = MainState.SyncError;
+		}
 
-			// wait for them to tap
-		}
-		else
-		{
-			// start up leaderboard controller
-		}
+		isSyncing = false;
 	}
 
-	private IEnumerator WaitForSecondsOrBreak(float duration)
+	private IEnumerator WaitForTap()
 	{
-		lastState = PendingState.Listening;
+		didTap = false;
+		
+		while (!didTap) 
+		{	
+			yield return null;
+		}
+		
+		didTap = false;
+	}
+
+	private IEnumerator WaitForSecondsOrTap(float duration)
+	{
+		didTap = false;
+
 		DateTime startTime = System.DateTime.UtcNow;
 		TimeSpan waitDuration = TimeSpan.FromSeconds(duration);
-		while (lastState != PendingState.Tap && lastState != PendingState.Neutral)
+		
+		while (!didTap) 
 		{
 			if(System.DateTime.UtcNow - startTime >= waitDuration)
 			{
-				lastState = PendingState.Neutral;
+				break;
 			}
-
+			
 			yield return null;
 		}
+
+		didTap = false;
 	}
 
-	private IEnumerator WaitForHoldOrBreak()
+	private bool ShouldSyncOverall()
 	{
-		lastState = PendingState.Listening;
-		while(lastState != PendingState.Hold && lastState != PendingState.Neutral && lastState != PendingState.Tap)
-		{
-			yield return null;
-		}
+		return ((GameManager.Instance.IsOnline) ? 
+		        (GameManager.Instance.PointsThreshold > ParseUser.CurrentUser.Get<int>(ParseUserUtils.KEY_STREAK)) : false);
 	}
 }

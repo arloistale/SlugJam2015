@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 using Parse;
 
-public class MessageBook : MonoBehaviour 
+public class MessageBook
 {
 	public static IDictionary<ParseException.ErrorCode, string> ParseExceptionMap = new Dictionary<ParseException.ErrorCode, string>() 
 	{
@@ -23,4 +23,6 @@ public class MessageBook : MonoBehaviour
 		{ ParseException.ErrorCode.UsernameTaken, "Username already taken" },
 		{ ParseException.ErrorCode.ValidationFailed, "Wrong credentials" }
 	};
+
+	public static string InstructionsMessage = "[Tap] to add SPACE between words as they are typed";
 }

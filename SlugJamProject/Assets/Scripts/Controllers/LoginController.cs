@@ -1,11 +1,13 @@
-using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.EventSystems;
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using System;
-
+using System.Threading.Tasks;
 using Parse;
+using UnityEngine;
+
+using UnityEngine.EventSystems;
+
+using UnityEngine.UI;
 
 public class LoginController : Controller, InputManager.InputListener
 {
@@ -163,33 +165,62 @@ public class LoginController : Controller, InputManager.InputListener
 		Writer.ClearWriting ();
 		AsyncWriter.RepeatText ("...");
 
-		ParseUser.LogInAsync (currUsernameStr, passwordStr).ContinueWith (t => 
-		{
-			if (t.IsFaulted || t.IsCanceled)
-			{
-				using (IEnumerator<System.Exception> enumerator = t.Exception.InnerExceptions.GetEnumerator()) 
-				{
-					if (enumerator.MoveNext()) 
-					{
-						ParseException exception = (ParseException) enumerator.Current;
-						currentErrorCode = exception.Code;
-						currentErrorType = ErrorType.ParseException;
-					}
-					else
-					{
-						currentErrorType = ErrorType.ParseInternal;
-					}
-				}
-				
-				loginState = LoginState.Error;
-			}
-			else
-			{
-				loginState = LoginState.Ready;
-			}
-		});
+		StartCoroutine (AuthCoroutine (currUsernameStr, passwordStr));
+	}
 
-		StartCoroutine (AuthCoroutine ());
+	private IEnumerator AuthCoroutine(string usernameStr, string passwordStr)
+	{
+		Task<ParseUser> authTask = ParseUser.LogInAsync (usernameStr, passwordStr);
+		
+		while (!authTask.IsCompleted) 
+		{
+			yield return null;
+		}
+		
+		if (authTask.IsFaulted || authTask.IsCanceled)
+		{
+			using (IEnumerator<System.Exception> enumerator = authTask.Exception.InnerExceptions.GetEnumerator()) 
+			{
+				if (enumerator.MoveNext()) 
+				{
+					ParseException exception = (ParseException) enumerator.Current;
+					currentErrorCode = exception.Code;
+					currentErrorType = ErrorType.ParseException;
+				}
+				else
+				{
+					currentErrorType = ErrorType.ParseInternal;
+				}
+			}
+			
+			loginState = LoginState.Error;
+		} else {
+			loginState = LoginState.Ready;
+		}
+		
+		// we're done, what did we get?
+		if (loginState == LoginState.Ready)
+			GoToLevel (GoLevelName);
+		else if (loginState == LoginState.Error)
+		{
+			string errorStr = "Unknown error";
+			
+			switch(currentErrorType)
+			{
+			case ErrorType.ParseInternal:
+				errorStr = "Server error";
+				break;
+			case ErrorType.ParseException:
+				if(MessageBook.ParseExceptionMap.ContainsKey(currentErrorCode))
+					errorStr = MessageBook.ParseExceptionMap[currentErrorCode];
+				else
+					errorStr = currentErrorCode + "";
+				break;
+			}
+			
+			AsyncWriter.WriteTextInstant(errorStr + "\n" +
+			                             "[Tap] to return\n");
+		}
 	}
 
 	private void SubmitPasswordRegister(string passwordStr)
@@ -203,105 +234,112 @@ public class LoginController : Controller, InputManager.InputListener
 		Writer.ClearWriting ();
 		AsyncWriter.RepeatText ("...");
 
-		IDictionary<string, object> userInfo = new Dictionary<string, object>
-		{
-			{ "username", currUsernameStr },
-			{ "password", passwordStr }
-		};
-		ParseCloud.CallFunctionAsync<IDictionary<string, object>>("SignUpCloud", userInfo).ContinueWith(t =>
-		{
-			if (t.IsFaulted || t.IsCanceled)
-			{
-				using (IEnumerator<System.Exception> enumerator = t.Exception.InnerExceptions.GetEnumerator()) 
-				{
-					if (enumerator.MoveNext()) 
-					{
-						ParseException exception = (ParseException) enumerator.Current;
-						currentErrorCode = exception.Code;
-						currentErrorType = ErrorType.ParseException;
-					}
-					else
-					{
-						currentErrorType = ErrorType.ParseInternal;
-					}
-				}
-
-				loginState = LoginState.Error;
-			} else {
-				IDictionary<string, object> result = t.Result;
-				// Hack, check for errors
-				object code;
-				if (result.TryGetValue("code", out code)) 
-				{
-					int errorCodeInt = Convert.ToInt32(code);
-					currentErrorCode = (ParseException.ErrorCode) errorCodeInt;
-					currentErrorType = ErrorType.ParseException;
-					loginState = LoginState.Error;
-				}
-				else 
-				{
-					object token;
-					if(result.TryGetValue("token", out token))
-					{
-						ParseUser.BecomeAsync((string) token).ContinueWith(ti => 
-						{
-							if (ti.IsFaulted || ti.IsCanceled)
-							{
-								using (IEnumerator<System.Exception> enumerator = ti.Exception.InnerExceptions.GetEnumerator()) 
-								{
-									if (enumerator.MoveNext()) 
-									{
-										ParseException exception = (ParseException) enumerator.Current;
-										currentErrorCode = exception.Code;
-										currentErrorType = ErrorType.ParseException;
-									}
-									else
-									{
-										currentErrorType = ErrorType.ParseInternal;
-									}
-								}
-								
-								loginState = LoginState.Error;
-							} 
-							else 
-							{
-								loginState = LoginState.Ready;
-							}
-						});
-					}
-				}
-			}
-		});
-
-		StartCoroutine (AuthCoroutine ());
+		StartCoroutine (RegisterCoroutine (currUsernameStr, passwordStr));
 	}
 
-	private IEnumerator AuthCoroutine()
+	private IEnumerator RegisterCoroutine(string usernameStr, string passwordStr)
 	{
-		while (loginState != LoginState.Ready && loginState != LoginState.Error) 
+		IDictionary<string, object> userInfo = new Dictionary<string, object>
+		{
+			{ "username", usernameStr },
+			{ "password", passwordStr }
+		};
+		Task<IDictionary<string, object>> registerTask = 
+			ParseCloud.CallFunctionAsync<IDictionary<string, object>> ("SignUpCloud", userInfo);
+
+		while (!registerTask.IsCompleted) 
 		{
 			yield return null;
 		}
+		
+		if (registerTask.IsFaulted || registerTask.IsCanceled)
+		{
+			using (IEnumerator<System.Exception> enumerator = registerTask.Exception.InnerExceptions.GetEnumerator()) 
+			{
+				if (enumerator.MoveNext()) 
+				{
+					ParseException exception = (ParseException) enumerator.Current;
+					currentErrorCode = exception.Code;
+					currentErrorType = ErrorType.ParseException;
+				}
+				else
+				{
+					currentErrorType = ErrorType.ParseInternal;
+				}
+			}
+			
+			loginState = LoginState.Error;
+		} else {
+			IDictionary<string, object> result = registerTask.Result;
+			// Hack, check for errors
+			object code;
+			if (result.TryGetValue("code", out code)) 
+			{
+				int errorCodeInt = Convert.ToInt32(code);
+				currentErrorCode = (ParseException.ErrorCode) errorCodeInt;
+				currentErrorType = ErrorType.ParseException;
+				loginState = LoginState.Error;
+			}
+			else 
+			{
+				// we need to sync the local instance of the current user with the one that was just logged in
+				// based on the session token we are given
+				object token;
+				if(result.TryGetValue("token", out token))
+				{
+					Task<ParseUser> becomeTask = ParseUser.BecomeAsync((string) token);
 
+					while(!becomeTask.IsCompleted)
+					{
+						yield return null;
+					}
+
+					if (becomeTask.IsFaulted || becomeTask.IsCanceled)
+					{
+						using (IEnumerator<System.Exception> enumerator = becomeTask.Exception.InnerExceptions.GetEnumerator()) 
+						{
+							if (enumerator.MoveNext()) 
+							{
+								ParseException exception = (ParseException) enumerator.Current;
+								currentErrorCode = exception.Code;
+								currentErrorType = ErrorType.ParseException;
+							}
+							else
+							{
+								currentErrorType = ErrorType.ParseInternal;
+							}
+						}
+						
+						loginState = LoginState.Error;
+					} 
+					else 
+					{
+						loginState = LoginState.Ready;
+					}
+				}
+			}
+		}
+
+		// we're done, what did we get?
 		if (loginState == LoginState.Ready)
 			GoToLevel (GoLevelName);
 		else if (loginState == LoginState.Error)
 		{
 			string errorStr = "Unknown error";
-
+			
 			switch(currentErrorType)
 			{
-				case ErrorType.ParseInternal:
-					errorStr = "Server error";
-					break;
-				case ErrorType.ParseException:
-					if(MessageBook.ParseExceptionMap.ContainsKey(currentErrorCode))
-						errorStr = MessageBook.ParseExceptionMap[currentErrorCode];
-					else
-						errorStr = currentErrorCode + "";
-					break;
+			case ErrorType.ParseInternal:
+				errorStr = "Server error";
+				break;
+			case ErrorType.ParseException:
+				if(MessageBook.ParseExceptionMap.ContainsKey(currentErrorCode))
+					errorStr = MessageBook.ParseExceptionMap[currentErrorCode];
+				else
+					errorStr = currentErrorCode + "";
+				break;
 			}
-
+			
 			AsyncWriter.WriteTextInstant(errorStr + "\n" +
 			                             "[Tap] to return\n");
 		}
@@ -317,7 +355,7 @@ public class LoginController : Controller, InputManager.InputListener
 	/// </summary>
 	private IEnumerator GoToLevelCoroutine(string levelName)
 	{
-		SetActive (false);
+		isActive = false;
 
 		if (!string.IsNullOrEmpty(levelName))
 			Application.LoadLevel(levelName);

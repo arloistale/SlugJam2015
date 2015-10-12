@@ -17,8 +17,7 @@ public class EntryController : Controller, InputManager.InputListener
 	public string GoLevelName;
 	public string LoginLevelName;
 
-	private TouchScreenKeyboard keyboard;
-
+	// internal data
 	private EntryState entryState;
 
 	protected override void Awake() 
@@ -30,7 +29,14 @@ public class EntryController : Controller, InputManager.InputListener
 
 	private void Start()
 	{
-		PromptEntry ();
+		if (ParseUser.CurrentUser != null) 
+		{
+			PromptLoggedIn();
+		} 
+		else 
+		{
+			PromptNormal();
+		}
 	}
 	
 	public void OnTouchBegin()
@@ -53,8 +59,8 @@ public class EntryController : Controller, InputManager.InputListener
 		switch (entryState) 
 		{
 			case EntryState.LoggedIn:
-				ParseUser.LogOut();
-				PromptEntry();
+				ParseUser.LogOutAsync();
+				PromptNormal();
 				
 				break;
 			case EntryState.Normal:
@@ -63,29 +69,19 @@ public class EntryController : Controller, InputManager.InputListener
 		}
 	}
 
-	private void PromptEntry()
+	private void PromptLoggedIn()
 	{
-		if (ParseUser.CurrentUser != null) 
-		{
-			entryState = EntryState.LoggedIn;
-		} 
-		else 
-		{
-			entryState = EntryState.Normal;
-		}
-		
-		switch(entryState)
-		{
-			case EntryState.LoggedIn:
-				Writer.WriteTextInstant ("Logged in as " + ParseUser.CurrentUser.Username + "\n"+
-				                         "[Tap] to play\n" +
-				                         "[Hold] to logout\n");
-				break;
-			case EntryState.Normal:
-				Writer.WriteTextInstant ("[Tap] to play offline\n" +
-				                         "[Hold] to login or signup\n");
-				break;
-		}
+		entryState = EntryState.LoggedIn;
+		Writer.WriteTextInstant ("Logged in as " + ParseUser.CurrentUser.Username + "\n"+
+		                         "[Tap] to play\n" +
+		                         "[Hold] to logout\n");
+	}
+
+	private void PromptNormal()
+	{
+		entryState = EntryState.Normal;
+		Writer.WriteTextInstant ("[Tap] to play offline\n" +
+		                         "[Hold] to login or signup\n");
 	}
 
 	/// <summary>
@@ -93,10 +89,8 @@ public class EntryController : Controller, InputManager.InputListener
 	/// </summary>
 	private IEnumerator GoToLevelCoroutine(string levelName)
 	{
-		SetActive (false);
+		isActive = false;
 
-		//yield return new WaitForSeconds(OutroFadeDuration);
-		
 		if (!string.IsNullOrEmpty(levelName))
 			Application.LoadLevel(levelName);
 		

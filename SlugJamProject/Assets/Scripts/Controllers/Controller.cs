@@ -10,8 +10,8 @@ public class Controller : MonoBehaviour
 		isActive = true;
 	}
 
-	public virtual void SetActive(bool flag)
+	public bool IsActive()
 	{
-		isActive = flag;
+		return isActive;
 	}
 }

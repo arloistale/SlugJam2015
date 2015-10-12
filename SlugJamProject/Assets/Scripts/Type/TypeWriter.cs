@@ -54,12 +54,23 @@ public class TypeWriter : MonoBehaviour
 		if (typeCoroutine != null)
 			StopCoroutine (typeCoroutine);
 
-		if (TypeSounds != null) {
-			int soundIndex = Random.Range(0, TypeSounds.Length);
-			SoundManager.Instance.PlaySound (TypeSounds[soundIndex], transform.position);
+		if (TypeSoundSpace != null) {
+			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
 		}
 
 		TypeText.text = message;
+	}
+
+	public void AppendTextInstant(string message)
+	{
+		if (typeCoroutine != null)
+			StopCoroutine (typeCoroutine);
+		
+		if (TypeSoundSpace != null) {
+			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
+		}
+		
+		TypeText.text += message;
 	}
 
 	public void WriteText(string message)
