@@ -174,14 +174,6 @@ public class MainController : Controller, InputManager.InputListener
 	{
 		lastState = mainState;
 		mainState = MainState.End;
-
-		if(GameManager.Instance.Points > GameManager.Instance.PointsThreshold) 
-		{
-			GameManager.Instance.SetPointsThreshold(GameManager.Instance.Points);
-
-			PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, GameManager.Instance.PointsThreshold);
-			PlayerPrefs.Save();
-		}
 		
 		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Points +
 		                        "\nHighest: " + GameManager.Instance.PointsThreshold + 
@@ -260,6 +252,14 @@ public class MainController : Controller, InputManager.InputListener
 					SoundManager.Instance.PlaySoundModulated(successSound, transform.position);
 				
 				GameManager.Instance.AddPoints(1);
+
+				if(GameManager.Instance.Points > GameManager.Instance.PointsThreshold) 
+				{
+					GameManager.Instance.SetPointsThreshold(GameManager.Instance.Points);
+					
+					PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, GameManager.Instance.PointsThreshold);
+					PlayerPrefs.Save();
+				}
 
 				if(GameManager.Instance.PointsThreshold > 0)
 					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Points + "\nHighest: " + GameManager.Instance.PointsThreshold);

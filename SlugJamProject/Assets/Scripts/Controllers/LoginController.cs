@@ -128,8 +128,7 @@ public class LoginController : Controller, InputManager.InputListener
 
 		loginState = LoginState.Password;
 
-		Writer.WriteTextInstant ("Username: " + currUsernameStr + "\n" +
-		                         "[Tap] to login\n" +
+		Writer.WriteTextInstant ("[Tap] to login\n" +
 		                         "[Hold] to signup\n" +
 		                         "Enter password");
 
@@ -147,15 +146,18 @@ public class LoginController : Controller, InputManager.InputListener
 
 	private void SubmitUsername(string usernameStr)
 	{
-		if (usernameStr.Length > 0) 
-		{
-			currUsernameStr = usernameStr;
-			PromptPassword();
-		}
+		if (usernameStr.Length == 0) 
+			return;
+
+		currUsernameStr = usernameStr;
+		PromptPassword();
 	}
 
 	private void SubmitPasswordAuth(string passwordStr)
 	{
+		if (passwordStr.Length == 0)
+			return;
+
 		loginState = LoginState.Authing;
 
 		PasswordCanvasGroup.alpha = 0;
