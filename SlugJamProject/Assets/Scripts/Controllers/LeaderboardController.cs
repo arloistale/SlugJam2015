@@ -35,7 +35,9 @@ public class LeaderboardController : Controller, InputManager.InputListener
 	public const int PAGINATION_AMOUNT = 10;
 	
 	// type data
-	public TypeWriter Writer;
+	public TypeWriter HeaderWriter;
+	public TypeWriter ListingWriter;
+	public TypeWriter AsyncWriter;
 
 	// cached data
 	private List<ParseUser> overallUsers;
@@ -67,7 +69,7 @@ public class LeaderboardController : Controller, InputManager.InputListener
 
 		StartCoroutine (FetchCoroutine ());
 
-		PromptOverall ();
+		PromptToday ();
 	}
 
 	public void OnTouchBegin()
@@ -79,6 +81,9 @@ public class LeaderboardController : Controller, InputManager.InputListener
 	public void OnTap()
 	{
 		if (!isActive)
+			return;
+
+		if (overallPageState == PageState.Fetching || todayPageState == PageState.Fetching)
 			return;
 
 		switch (leaderboardPage) 
@@ -98,6 +103,9 @@ public class LeaderboardController : Controller, InputManager.InputListener
 	public void OnHold()
 	{
 		if (!isActive)
+			return;
+
+		if (overallPageState == PageState.Fetching || todayPageState == PageState.Fetching)
 			return;
 		
 		switch (leaderboardPage) 
@@ -120,17 +128,15 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		
 		if (overallPageState == PageState.Ready) 
 		{
-			Writer.WriteTextInstant("Top Overall\n" +
-			                        "[Tap] to cycle\n\n");
-			for(int i = 0; i < overallUsers.Count; i++)
-			{
-				Writer.AppendTextInstant(overallUsers[i].Username + ": " + overallUsers[i].Get<int>(ParseUserUtils.KEY_STREAK) + "\n");
-			}
+			AsyncWriter.ClearWriting();
+			HeaderWriter.WriteTextInstant("Top Overall\n" +
+			                              "[Tap] to cycle");
+
+			ListingWriter.WriteTextInstant(GetStreakListing(overallUsers));
 		}
 		else if (overallPageState == PageState.Fetching) 
 		{
-			Writer.WriteTextInstant("Fetching...\n" +
-			                        "[Tap] to cycle\n");
+			AsyncWriter.WriteTextInstant("Fetching...");
 		}
 		else if (overallPageState == PageState.Error)
 		{
@@ -149,7 +155,7 @@ public class LeaderboardController : Controller, InputManager.InputListener
 				break;
 			}
 			
-			Writer.WriteTextInstant(errorStr + "\n" +
+			AsyncWriter.WriteTextInstant(errorStr + "\n" +
 			                        "[Tap] to cycle\n");
 		}
 	}
@@ -160,16 +166,16 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		
 		if (todayPageState == PageState.Ready) 
 		{
-			Writer.WriteTextInstant("Top Today\n" +
-			                        "[Tap] to cycle\n\n");
-			for(int i = 0; i < todayUsers.Count; i++)
-			{
-				Writer.AppendTextInstant(todayUsers[i].Username + ": " + todayUsers[i].Get<int>(ParseUserUtils.KEY_STREAK) + "\n");
-			}
+			AsyncWriter.ClearWriting();
+
+			HeaderWriter.WriteTextInstant("Top Today\n" +
+			                              "[Tap] to cycle");
+
+			ListingWriter.WriteTextInstant(GetStreakListing(todayUsers));
 		}
-		else if (todayPageState == PageState.Fetching) 
+		else if (todayPageState == PageState.Fetching)
 		{
-			Writer.WriteTextInstant("Fetching...");
+			AsyncWriter.WriteTextInstant("Fetching...");
 		}
 		else if (todayPageState == PageState.Error)
 		{
@@ -188,8 +194,8 @@ public class LeaderboardController : Controller, InputManager.InputListener
 				break;
 			}
 			
-			Writer.WriteTextInstant(errorStr + "\n" +
-			                        "[Tap] to cycle\n");
+			AsyncWriter.WriteTextInstant(errorStr + "\n" +
+			                             "[Tap] to cycle\n");
 		}
 	}
 	
@@ -286,5 +292,21 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		
 		if (leaderboardPage == LeaderboardPage.Today)
 			PromptToday ();
+	}
+
+	private string GetStreakListing(List<ParseUser> users)
+	{
+		string listingStr = "";
+		
+		for(int i = 0; i < users.Count; i++)
+		{
+			listingStr += String.Format("{0,-5} {1,-12} {2,5}", (i + 1) + ".", 
+			                            users[i].Username, users[i].Get<int>(ParseUserUtils.KEY_STREAK));
+			
+			if(i < (users.Count - 1))
+				listingStr += "\n";
+		}
+		
+		return listingStr;
 	}
 }

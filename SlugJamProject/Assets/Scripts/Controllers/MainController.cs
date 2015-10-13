@@ -195,7 +195,7 @@ public class MainController : Controller, InputManager.InputListener
 		while (true) 
 		{
 			// get a random phrase and generate a raw message from the phrase
-			int phraseIndex = (GameManager.Instance.PointsThreshold > 0) ? UnityEngine.Random.Range (0, Phrases.Length) : 0;
+			int phraseIndex = (GameManager.Instance.PointsThreshold > 0) ? UnityEngine.Random.Range (1, Phrases.Length) : 0;
 			Phrase randomPhrase = Phrases[phraseIndex];
 			string rawMessage = Regex.Replace(randomPhrase.correctMessage, @"\s+", "");
 			string correctMessage = randomPhrase.correctMessage;
@@ -203,8 +203,8 @@ public class MainController : Controller, InputManager.InputListener
 
 			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
 			Writer.SetMode(TypeWriter.WriterMode.Normal);
-			Writer.WriteText (rawMessage + "\n" + 
-			                  wordCount + " words\n");
+			Writer.WriteTextInstant (rawMessage + "\n" + 
+			                  wordCount + " words");
 
 			yield return StartCoroutine(WaitForSecondsOrTap(3f));
 		
@@ -306,7 +306,8 @@ public class MainController : Controller, InputManager.InputListener
 				yield break;
 			}
 		}
-		
+
+		Writer.ClearWriting ();
 		LeaderboardController.Activate ();
 	}
 
