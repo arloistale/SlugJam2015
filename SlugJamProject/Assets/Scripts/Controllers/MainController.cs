@@ -66,25 +66,26 @@ public class MainController : Controller, InputManager.InputListener
 		// will still be saved locally even offline so the user can still progress offline
 		// and the score will persist when the user logs back in
 		// but when a new account logs in the local score will be set to the new users score
-		int prefsOverallStreak = PlayerPrefs.GetInt (ParseUserUtils.KEY_STREAK, 0);
+		int prefsStreak = PlayerPrefs.GetInt (ParseUserUtils.KEY_STREAK, 0);
+		//DateTime dailyTimestamp = PlayerPrefs.GetString(
 
 		if (GameManager.Instance.IsOnline)
 		{
 			if(PlayerPrefs.GetString(ParseUserUtils.KEY_CACHED_ID) != ParseUser.CurrentUser.ObjectId)
 			{
-				int userOverallStreak = ParseUser.CurrentUser.Get<int> (ParseUserUtils.KEY_STREAK);
-				prefsOverallStreak = userOverallStreak;
-				PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, prefsOverallStreak);
+				prefsStreak = ParseUser.CurrentUser.Get<int> (ParseUserUtils.KEY_STREAK);
+
 				PlayerPrefs.SetString(ParseUserUtils.KEY_CACHED_ID, ParseUser.CurrentUser.ObjectId);
+				PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, prefsStreak);
 				PlayerPrefs.Save();
 			}
 			// if the user is the same as the before then the local score should be aligned
 			// with the user score
 		}
 
-		GameManager.Instance.SetPointsThreshold(prefsOverallStreak);
+		GameManager.Instance.SetHighStreak(prefsStreak);
 		
-		GameManager.Instance.SetPoints (0);
+		GameManager.Instance.SetStreak (0);
 
 		PromptIntro ();
 	}
@@ -146,8 +147,8 @@ public class MainController : Controller, InputManager.InputListener
 		lastState = mainState;
 		mainState = MainState.Intro;
 
-		string greetingMessage = (GameManager.Instance.PointsThreshold > 0) ? 
-			("Highest: " + GameManager.Instance.PointsThreshold) : ("Hello.");
+		string greetingMessage = (GameManager.Instance.HighStreak > 0) ? 
+			("Highest: " + GameManager.Instance.HighStreak) : ("Hello.");
 
 		Writer.WriteTextInstant (greetingMessage + "\n[Tap] to continue\n[Hold] for leaderboard");
 	}
@@ -175,12 +176,12 @@ public class MainController : Controller, InputManager.InputListener
 		lastState = mainState;
 		mainState = MainState.End;
 		
-		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Points +
-		                        "\nHighest: " + GameManager.Instance.PointsThreshold + 
+		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak +
+		                        "\nHighest: " + GameManager.Instance.HighStreak + 
 		                        "\n[Tap] to retry" +
 		                        "\n[Hold] for leaderboard");
 		
-		GameManager.Instance.SetPoints(0);
+		GameManager.Instance.SetStreak(0);
 	}
 
 	private IEnumerator InstructionsCoroutine()
@@ -195,7 +196,7 @@ public class MainController : Controller, InputManager.InputListener
 		while (true) 
 		{
 			// get a random phrase and generate a raw message from the phrase
-			int phraseIndex = (GameManager.Instance.PointsThreshold > 0) ? UnityEngine.Random.Range (1, Phrases.Length) : 0;
+			int phraseIndex = (GameManager.Instance.HighStreak > 0) ? UnityEngine.Random.Range (1, Phrases.Length) : 0;
 			Phrase randomPhrase = Phrases[phraseIndex];
 			string rawMessage = Regex.Replace(randomPhrase.correctMessage, @"\s+", "");
 			string correctMessage = randomPhrase.correctMessage;
@@ -251,20 +252,20 @@ public class MainController : Controller, InputManager.InputListener
 				if(successSound != null)
 					SoundManager.Instance.PlaySoundModulated(successSound, transform.position);
 				
-				GameManager.Instance.AddPoints(1);
+				GameManager.Instance.AddStreak(1);
 
-				if(GameManager.Instance.Points > GameManager.Instance.PointsThreshold) 
+				if(GameManager.Instance.Streak > GameManager.Instance.HighStreak) 
 				{
-					GameManager.Instance.SetPointsThreshold(GameManager.Instance.Points);
+					GameManager.Instance.SetHighStreak(GameManager.Instance.Streak);
 					
-					PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, GameManager.Instance.PointsThreshold);
+					PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, GameManager.Instance.HighStreak);
 					PlayerPrefs.Save();
 				}
 
-				if(GameManager.Instance.PointsThreshold > 0)
-					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Points + "\nHighest: " + GameManager.Instance.PointsThreshold);
+				if(GameManager.Instance.HighStreak > 0)
+					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
 				else
-					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Points);
+					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak);
 
 				yield return StartCoroutine(WaitForSecondsOrTap(3f));
 			}
@@ -317,21 +318,26 @@ public class MainController : Controller, InputManager.InputListener
 
 		Writer.WriteTextInstant("Syncing...");
 
-		int streakValue = GameManager.Instance.PointsThreshold;
+		int streakValue = GameManager.Instance.HighStreak;
 
 		ParseUser currentUser = ParseUser.CurrentUser;
 		currentUser[ParseUserUtils.KEY_STREAK] = streakValue;
 
-		Task saveTask = currentUser.SaveAsync ();
-
-		while (!saveTask.IsCompleted) 
+		IDictionary<string, object> userInfo = new Dictionary<string, object>
+		{
+			{ ParseUserUtils.KEY_STREAK, streakValue }
+		};
+		Task<IDictionary<string, object>> syncTask = 
+			ParseCloud.CallFunctionAsync<IDictionary<string, object>> ("SubmitStreak", userInfo);
+		
+		while (!syncTask.IsCompleted) 
 		{
 			yield return null;
 		}
-
-		if (saveTask.IsFaulted || saveTask.IsCanceled)
+		
+		if (syncTask.IsFaulted || syncTask.IsCanceled)
 		{
-			using (IEnumerator<System.Exception> enumerator = saveTask.Exception.InnerExceptions.GetEnumerator()) 
+			using (IEnumerator<System.Exception> enumerator = syncTask.Exception.InnerExceptions.GetEnumerator()) 
 			{
 				if (enumerator.MoveNext()) 
 				{
@@ -344,7 +350,7 @@ public class MainController : Controller, InputManager.InputListener
 					currentErrorType = ErrorType.ParseInternal;
 				}
 			}
-
+			
 			lastState = mainState;
 			mainState = MainState.SyncError;
 		}
@@ -387,6 +393,6 @@ public class MainController : Controller, InputManager.InputListener
 	private bool ShouldSyncOverall()
 	{
 		return ((GameManager.Instance.IsOnline) ? 
-		        (GameManager.Instance.PointsThreshold > ParseUser.CurrentUser.Get<int>(ParseUserUtils.KEY_STREAK)) : false);
+		        (GameManager.Instance.HighStreak > ParseUser.CurrentUser.Get<int>(ParseUserUtils.KEY_STREAK)) : false);
 	}
 }

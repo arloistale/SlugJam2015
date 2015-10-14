@@ -19,3 +19,37 @@ Parse.Cloud.define("SignUpCloud", function(request, response) {
     }
   });
 });
+
+Parse.Cloud.define("SubmitStreak", function(request, response) {
+  var user = request.user;
+  var streak = request.params.streak;
+
+  if(!streak)
+    response.error("SubmitStreak: Invalid params");
+
+  if(streak > user.get("streak"))
+    user.set("streak", streak);
+
+  var dailyTimestamp = user.get("dailyTimestamp");
+  var currentDate = new Date();
+  var isSameDay = (dailyTimestamp.getDate() == currentDate.getDate() 
+        && dailyTimestamp.getMonth() == currentDate.getMonth()
+        && dailyTimestamp.getFullYear() == currentDate.getFullYear());
+
+  if(!isSameDay)
+  {
+    user.set("dailyStreak", 0);
+  }
+
+  if(streak > user.get("dailyStreak"))
+    user.set("dailyStreak", streak);
+
+  user.save(null, {
+    success: function(savedUser) {
+      response.success();
+    },
+    error: function(savedUser, error) {
+      response.error({ "code": error.code, "message": error.message });
+    }
+  });
+});
