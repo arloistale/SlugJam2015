@@ -18,6 +18,31 @@ public class InputManager : PersistentSingleton<InputManager>
 	private bool isHolding;
 	private bool didExpendHold;
 	private float holdDuration;
+
+	void Start()
+	{
+		isHolding = false;
+	}
+
+	void OnApplicationPause()
+	{
+		isHolding = false;
+	}
+
+	void OnApplicationFocus()
+	{
+		isHolding = false;
+	}
+
+	void Enable()
+	{
+		isHolding = false;
+	}
+
+	void Disable()
+	{
+		isHolding = false;
+	}
 	
 	/// <summary>
 	/// At update, we check the various commands and send them to the input listener.
@@ -26,9 +51,7 @@ public class InputManager : PersistentSingleton<InputManager>
 	{
 		// assert that there is an input listener
 		if (inputListener == null)
-		{
 			return;
-		}
 
 		if (isHolding) 
 		{
@@ -78,6 +101,7 @@ public class InputManager : PersistentSingleton<InputManager>
 
 	private void OnTouchBegin()
 	{
+		holdDuration = 0f;
 		didExpendHold = false;
 		isHolding = true;
 		inputListener.OnTouchBegin ();

@@ -61,6 +61,15 @@ public class LoginController : Controller, InputManager.InputListener
 		PromptUsername ();
 	}
 
+	void OnApplicationFocus()
+	{
+		if(loginState == LoginState.Username)
+			EventSystem.current.SetSelectedGameObject(UsernameField.gameObject, null);
+
+		if(loginState == LoginState.Password)
+			EventSystem.current.SetSelectedGameObject(PasswordField.gameObject, null);
+	}
+
 	public void OnTouchBegin()
 	{
 	}
@@ -147,7 +156,10 @@ public class LoginController : Controller, InputManager.InputListener
 	private void SubmitUsername(string usernameStr)
 	{
 		if (usernameStr.Length == 0) 
+		{
+			PromptUsername();
 			return;
+		}
 
 		currUsernameStr = usernameStr;
 		PromptPassword();
@@ -155,8 +167,11 @@ public class LoginController : Controller, InputManager.InputListener
 
 	private void SubmitPasswordAuth(string passwordStr)
 	{
-		if (passwordStr.Length == 0)
+		if (passwordStr.Length == 0) 
+		{
+			PromptPassword();
 			return;
+		}
 
 		loginState = LoginState.Authing;
 
@@ -174,10 +189,7 @@ public class LoginController : Controller, InputManager.InputListener
 	{
 		Task<ParseUser> authTask = ParseUser.LogInAsync (usernameStr, passwordStr);
 		
-		while (!authTask.IsCompleted) 
-		{
-			yield return null;
-		}
+		while (!authTask.IsCompleted) yield return null;
 		
 		if (authTask.IsFaulted || authTask.IsCanceled)
 		{
@@ -201,8 +213,11 @@ public class LoginController : Controller, InputManager.InputListener
 		}
 		
 		// we're done, what did we get?
-		if (loginState == LoginState.Ready)
+		if (loginState == LoginState.Ready) 
+		{
+			GameManager.Instance.IsOnline = true;
 			GoToLevel (GoLevelName);
+		}
 		else if (loginState == LoginState.Error)
 		{
 			string errorStr = "Unknown error";
@@ -323,8 +338,11 @@ public class LoginController : Controller, InputManager.InputListener
 		}
 
 		// we're done, what did we get?
-		if (loginState == LoginState.Ready)
+		if (loginState == LoginState.Ready) 
+		{
+			GameManager.Instance.IsOnline = true;
 			GoToLevel (GoLevelName);
+		}
 		else if (loginState == LoginState.Error)
 		{
 			string errorStr = "Unknown error";

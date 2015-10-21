@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 using Parse;
 
-public class MainController : Controller, InputManager.InputListener
+public class MainController : Controller, InputManager.InputListener, LeaderboardController.LeaderboardListener
 {
 	private enum MainState
 	{
@@ -26,16 +26,22 @@ public class MainController : Controller, InputManager.InputListener
 		ParseException
 	}
 
-	// leaderboad data
+	// data data
+	public PhraseBook PhraseBook;
+	public TierBook TierBook;
+
+	// modular data
 	public LeaderboardController LeaderboardController;
+	public SharingHandler SharingHandler;
 
 	// type data
 	public TypeWriter Writer;
-	public Phrase[] Phrases = new Phrase[] {};
 	public AudioClip errorSound;
 	public AudioClip successSound;
 
 	// internal data
+	private int SCORE_MAX = 8192;
+
 	private MainState lastState;
 	private MainState mainState;
 	private ErrorType currentErrorType;
@@ -50,6 +56,7 @@ public class MainController : Controller, InputManager.InputListener
 		base.Awake ();
 
 		InputManager.Instance.SetInputListener (this);
+		LeaderboardController.SetListener (this);
 	}
 
 	private void Start()
@@ -67,25 +74,59 @@ public class MainController : Controller, InputManager.InputListener
 		// and the score will persist when the user logs back in
 		// but when a new account logs in the local score will be set to the new users score
 		int prefsStreak = PlayerPrefs.GetInt (ParseUserUtils.KEY_STREAK, 0);
-		//DateTime dailyTimestamp = PlayerPrefs.GetString(
+		int prefsDailyStreak = PlayerPrefs.GetInt (ParseUserUtils.KEY_DAILY_STREAK, 0);
+		string prefsDailyTimestampRaw = PlayerPrefs.GetString (ParseUserUtils.KEY_DAILY_TIMESTAMP, "");
+		DateTime prefsDailyTimestamp = (prefsDailyTimestampRaw.Length > 0) ? 
+			DateTime.FromBinary (Convert.ToInt64 (prefsDailyTimestampRaw)) : DateTime.UtcNow;
 
 		if (GameManager.Instance.IsOnline)
 		{
+			int userStreak = ParseUser.CurrentUser.Get<int> (ParseUserUtils.KEY_STREAK);
+			int userDailyStreak = ParseUser.CurrentUser.Get<int>(ParseUserUtils.KEY_DAILY_STREAK);
+			DateTime userDailyTimestamp = ParseUser.CurrentUser.Get<DateTime>(ParseUserUtils.KEY_DAILY_TIMESTAMP).ToUniversalTime();
 			if(PlayerPrefs.GetString(ParseUserUtils.KEY_CACHED_ID) != ParseUser.CurrentUser.ObjectId)
 			{
-				prefsStreak = ParseUser.CurrentUser.Get<int> (ParseUserUtils.KEY_STREAK);
+				prefsStreak = userStreak;
+				prefsDailyStreak = userDailyStreak;
+				prefsDailyTimestamp = userDailyTimestamp;
 
 				PlayerPrefs.SetString(ParseUserUtils.KEY_CACHED_ID, ParseUser.CurrentUser.ObjectId);
 				PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, prefsStreak);
+				PlayerPrefs.SetInt (ParseUserUtils.KEY_DAILY_STREAK, prefsDailyStreak);
+				PlayerPrefs.SetString(ParseUserUtils.KEY_DAILY_TIMESTAMP, prefsDailyTimestamp.ToBinary().ToString());
 				PlayerPrefs.Save();
+			}
+			else
+			{
+				if(userStreak > prefsStreak)
+				{
+					prefsStreak = userStreak;
+					PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, prefsStreak);
+					PlayerPrefs.Save();
+				}
+
+				if(userDailyStreak > prefsStreak)
+				{
+					prefsDailyStreak = userDailyStreak;
+					PlayerPrefs.SetInt(ParseUserUtils.KEY_DAILY_STREAK, prefsDailyStreak);
+					PlayerPrefs.Save();
+				}
+
+				if(userDailyTimestamp > prefsDailyTimestamp)
+				{
+					prefsDailyTimestamp = userDailyTimestamp;
+					PlayerPrefs.SetString(ParseUserUtils.KEY_DAILY_TIMESTAMP, prefsDailyTimestamp.ToBinary().ToString());
+					PlayerPrefs.Save();
+				}
 			}
 			// if the user is the same as the before then the local score should be aligned
 			// with the user score
 		}
 
-		GameManager.Instance.SetHighStreak(prefsStreak);
-		
-		GameManager.Instance.SetStreak (0);
+		GameManager.Instance.DailyStreak = prefsDailyStreak;
+		GameManager.Instance.DailyTimestamp = prefsDailyTimestamp;
+		GameManager.Instance.HighStreak = prefsStreak;
+		GameManager.Instance.Streak = 0;
 
 		PromptIntro ();
 	}
@@ -104,7 +145,10 @@ public class MainController : Controller, InputManager.InputListener
 
 	public void OnTap()
 	{
-		if (!isActive && !isSyncing && !LeaderboardController.IsActive())
+		if (!isActive)
+			return;
+
+		if(isSyncing || LeaderboardController.IsActive() || SharingHandler.isSharing)
 			return;
 
 		didTap = true;
@@ -112,10 +156,14 @@ public class MainController : Controller, InputManager.InputListener
 		switch (mainState) 
 		{
 		case MainState.Intro:
-			PromptInstructions();
+			if(GameManager.Instance.HighStreak > 0)
+				PromptGame();
+			else
+				PromptInstructions();
+
 			break;
 		case MainState.End:
-			PromptGame();
+			PromptIntro();
 			break;
 		case MainState.SyncError:
 			if(lastState == MainState.End)
@@ -128,16 +176,36 @@ public class MainController : Controller, InputManager.InputListener
 
 	public void OnHold()
 	{
-		if (!isActive && !isSyncing && !LeaderboardController.IsActive())
+		if (!isActive)
+			return;
+
+		if(isSyncing || LeaderboardController.IsActive() || SharingHandler.isSharing)
 			return;
 
 		switch (mainState) 
 		{
 		case MainState.Intro:
-			StartCoroutine(LeaderboardCoroutine());
+			if(GameManager.Instance.IsOnline)
+				StartCoroutine(LeaderboardCoroutine());
 			break;
 		case MainState.End:
-			StartCoroutine(LeaderboardCoroutine());
+			SharingHandler.Share();
+			break;
+		}
+	}
+
+	public void OnLeaderboardActivate() {}
+
+	public void OnLeaderboardEnd()
+	{
+		InputManager.Instance.SetInputListener (this);
+		switch (mainState)
+		{
+		case MainState.Intro:
+			PromptIntro();
+			break;
+		case MainState.End:
+			PromptEnd();
 			break;
 		}
 	}
@@ -150,7 +218,9 @@ public class MainController : Controller, InputManager.InputListener
 		string greetingMessage = (GameManager.Instance.HighStreak > 0) ? 
 			("Highest: " + GameManager.Instance.HighStreak) : ("Hello.");
 
-		Writer.WriteTextInstant (greetingMessage + "\n[Tap] to continue\n[Hold] for leaderboard");
+		Writer.WriteTextInstant (greetingMessage + 
+		                         "\n[Tap] to continue" +
+		                         (GameManager.Instance.IsOnline ? "\n[Hold] for leaderboard" : ""));
 	}
 
 	private void PromptInstructions()
@@ -178,10 +248,8 @@ public class MainController : Controller, InputManager.InputListener
 		
 		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak +
 		                        "\nHighest: " + GameManager.Instance.HighStreak + 
-		                        "\n[Tap] to retry" +
-		                        "\n[Hold] for leaderboard");
-		
-		GameManager.Instance.SetStreak(0);
+		                        "\n[Tap] to return" +
+		                        (GameManager.Instance.IsOnline ? "\n[Hold] to share" : ""));
 	}
 
 	private IEnumerator InstructionsCoroutine()
@@ -193,25 +261,27 @@ public class MainController : Controller, InputManager.InputListener
 
 	private IEnumerator GameCoroutine()
 	{
+		int currTierIndex = 0;
+		GameManager.Instance.Streak = 0;
+
 		while (true) 
 		{
-			// get a random phrase and generate a raw message from the phrase
-			int phraseIndex = (GameManager.Instance.HighStreak > 0) ? UnityEngine.Random.Range (1, Phrases.Length) : 0;
-			Phrase randomPhrase = Phrases[phraseIndex];
-			string rawMessage = Regex.Replace(randomPhrase.correctMessage, @"\s+", "");
-			string correctMessage = randomPhrase.correctMessage;
-			int wordCount = randomPhrase.correctMessage.Split(' ').Length;
+			GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
+			int wordLimit = GameManager.Instance.Tier.TierWordLimit;
+			float typingSpeed = GameManager.Instance.Tier.TierTypingSpeed;
 
-			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_SHORT);
-			Writer.SetMode(TypeWriter.WriterMode.Normal);
-			Writer.WriteTextInstant (rawMessage + "\n" + 
-			                  wordCount + " words");
+			// get a random phrase and generate a raw message from the phrase
+			Phrase randomPhrase = PhraseBook.GetPhraseWithWordLimit(wordLimit);
+			string correctMessage = randomPhrase.CorrectMessage;
+			string rawMessage = Regex.Replace(correctMessage, @"\s+", "");
+			int wordCount = correctMessage.Split(' ').Length;
+
+			Writer.WriteTextInstant (rawMessage + "\n" + wordCount + " words");
 
 			yield return StartCoroutine(WaitForSecondsOrTap(3f));
-		
-			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_MEDIUM);
 			
 			// start writing raw message
+			Writer.SetTypeDuration (typingSpeed);
 			Writer.SetMode(TypeWriter.WriterMode.CullSpaces);
 			Writer.WriteText (correctMessage);
 
@@ -244,30 +314,46 @@ public class MainController : Controller, InputManager.InputListener
 			yield return new WaitForSeconds(1f);
 
 			Writer.SetTextStatusColor(TypeWriter.TypeStatus.Normal);
-			Writer.SetTypeDuration(TypeWriter.TYPE_DURATION_SHORT);
-			Writer.SetMode(TypeWriter.WriterMode.Normal);
 
 			if(writeResult)
 			{
 				if(successSound != null)
 					SoundManager.Instance.PlaySoundModulated(successSound, transform.position);
 				
-				GameManager.Instance.AddStreak(1);
+				GameManager.Instance.Streak = Math.Min(SCORE_MAX, GameManager.Instance.Streak + 1);
 
-				if(GameManager.Instance.Streak > GameManager.Instance.HighStreak) 
+				if(currTierIndex + 1 < TierBook.TierList.Count && GameManager.Instance.Streak >= TierBook.TierList[currTierIndex + 1].TierThreshold)
 				{
-					GameManager.Instance.SetHighStreak(GameManager.Instance.Streak);
-					
-					PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, GameManager.Instance.HighStreak);
+					currTierIndex++;
+				}
+
+				// first check if its a new day and update the day
+				if(DateTime.UtcNow.Date > GameManager.Instance.DailyTimestamp.ToUniversalTime().Date)
+				{
+					GameManager.Instance.DailyStreak = 0;
+					GameManager.Instance.DailyTimestamp = DateTime.UtcNow;
+					PlayerPrefs.SetString(ParseUserUtils.KEY_DAILY_TIMESTAMP, GameManager.Instance.DailyTimestamp.ToBinary().ToString());
+				} 
+
+				// TODO: Potential problem here where timestamp might not save
+				if(GameManager.Instance.Streak > GameManager.Instance.DailyStreak)
+				{
+					GameManager.Instance.DailyStreak = GameManager.Instance.Streak;
+					PlayerPrefs.SetInt(ParseUserUtils.KEY_DAILY_STREAK, GameManager.Instance.DailyStreak);
+
+					if(GameManager.Instance.Streak > GameManager.Instance.HighStreak) 
+					{
+						GameManager.Instance.HighStreak = GameManager.Instance.Streak;
+						PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, GameManager.Instance.HighStreak);
+					}
+
 					PlayerPrefs.Save();
 				}
 
-				if(GameManager.Instance.HighStreak > 0)
-					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
-				else
-					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak);
+				// display streaks
+				Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
 
-				yield return StartCoroutine(WaitForSecondsOrTap(3f));
+				yield return StartCoroutine(WaitForSecondsOrTap(2f));
 			}
 			else
 			{
@@ -318,14 +404,11 @@ public class MainController : Controller, InputManager.InputListener
 
 		Writer.WriteTextInstant("Syncing...");
 
-		int streakValue = GameManager.Instance.HighStreak;
-
-		ParseUser currentUser = ParseUser.CurrentUser;
-		currentUser[ParseUserUtils.KEY_STREAK] = streakValue;
-
 		IDictionary<string, object> userInfo = new Dictionary<string, object>
 		{
-			{ ParseUserUtils.KEY_STREAK, streakValue }
+			{ ParseUserUtils.KEY_STREAK, GameManager.Instance.HighStreak },
+			{ ParseUserUtils.KEY_DAILY_STREAK, GameManager.Instance.DailyStreak },
+			{ ParseUserUtils.KEY_DAILY_TIMESTAMP, GameManager.Instance.DailyTimestamp }
 		};
 		Task<IDictionary<string, object>> syncTask = 
 			ParseCloud.CallFunctionAsync<IDictionary<string, object>> ("SubmitStreak", userInfo);
@@ -374,12 +457,12 @@ public class MainController : Controller, InputManager.InputListener
 	{
 		didTap = false;
 
-		DateTime startTime = System.DateTime.UtcNow;
+		DateTime startTime = DateTime.UtcNow;
 		TimeSpan waitDuration = TimeSpan.FromSeconds(duration);
 		
 		while (!didTap) 
 		{
-			if(System.DateTime.UtcNow - startTime >= waitDuration)
+			if(DateTime.UtcNow - startTime >= waitDuration)
 			{
 				break;
 			}
@@ -392,7 +475,12 @@ public class MainController : Controller, InputManager.InputListener
 
 	private bool ShouldSyncOverall()
 	{
-		return ((GameManager.Instance.IsOnline) ? 
-		        (GameManager.Instance.HighStreak > ParseUser.CurrentUser.Get<int>(ParseUserUtils.KEY_STREAK)) : false);
+		if (!GameManager.Instance.IsOnline)
+			return false;
+
+		if(GameManager.Instance.DailyStreak > ParseUser.CurrentUser.Get<int>(ParseUserUtils.KEY_DAILY_STREAK))
+			return true;
+
+		return DateTime.UtcNow.Date != ParseUser.CurrentUser.Get<DateTime>(ParseUserUtils.KEY_DAILY_TIMESTAMP).Date;
 	}
 }

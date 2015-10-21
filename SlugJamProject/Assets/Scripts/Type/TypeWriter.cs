@@ -20,7 +20,7 @@ public class TypeWriter : MonoBehaviour
 	// constants
 	public const float TYPE_DURATION_SHORT = 0.05f;
 	public const float TYPE_DURATION_LONG = 0.5f;
-	public const float TYPE_DURATION_MEDIUM = 0.15f;
+	public const float TYPE_DURATION_MEDIUM = 0.1f;
 
 	// external data
 	public AudioClip[] TypeSounds = new AudioClip[] {};
@@ -34,7 +34,8 @@ public class TypeWriter : MonoBehaviour
 
 	// type data
 	private WriterMode writerMode;
-
+	private string currTypeMessage;
+	private string finalMessage;
 	private float typePauseDuration = 0.2f;
 
 	public bool isWriting { get; private set; }
@@ -51,22 +52,30 @@ public class TypeWriter : MonoBehaviour
 
 	public void WriteTextInstant(string message)
 	{
-		if (typeCoroutine != null)
+		if (typeCoroutine != null) 
+		{
 			StopCoroutine (typeCoroutine);
+			typeCoroutine = null;
+		}
 
 		if (TypeSoundSpace != null) {
 			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
 		}
 
-		TypeText.text = message;
+		currTypeMessage = message;
+		TypeText.text = currTypeMessage;
 	}
 
 	public void AppendTextInstant(string message)
 	{
-		if (typeCoroutine != null)
+		if (typeCoroutine != null) 
+		{
 			StopCoroutine (typeCoroutine);
+			typeCoroutine = null;
+		}
 		
-		if (TypeSoundSpace != null) {
+		if (TypeSoundSpace != null) 
+		{
 			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
 		}
 		
@@ -75,40 +84,50 @@ public class TypeWriter : MonoBehaviour
 
 	public void WriteText(string message)
 	{
-		TypeText.text = "";
+		ClearWriting ();
 
-		if (typeCoroutine != null)
+		if (typeCoroutine != null) 
+		{
 			StopCoroutine (typeCoroutine);
+			typeCoroutine = null;
+		}
 
 		typeCoroutine = StartCoroutine (WriteTextCoroutine (message));
 	}
 
 	public void RepeatText(string message)
 	{
-		TypeText.text = "";
+		ClearWriting ();
 		
-		if (typeCoroutine != null)
+		if (typeCoroutine != null) 
+		{
 			StopCoroutine (typeCoroutine);
+			typeCoroutine = null;
+		}
 		
 		typeCoroutine = StartCoroutine (RepeatTextCoroutine (message));
 	}
 
 	public void ClearWriting()
 	{
+		currTypeMessage = "";
 		TypeText.text = "";
 	}
 
 	public void StopWriting()
 	{
-		if (typeCoroutine != null)
+		if (typeCoroutine != null) 
+		{
 			StopCoroutine (typeCoroutine);
+			typeCoroutine = null;
+		}
 
 		isWriting = false;
 	}
 
 	public string GetWrittenText() 
 	{
-		return TypeText.text;
+		return currTypeMessage;
 	}
 
 	public void AddSpace() 
@@ -116,7 +135,10 @@ public class TypeWriter : MonoBehaviour
 		if(TypeSoundSpace != null)
 			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
 
-		TypeText.text += " ";
+		if(currTypeMessage != finalMessage)
+			currTypeMessage += ' ';
+
+		TypeText.text = currTypeMessage;
 	}
 
 	public void SetTypeDuration(float duration)
@@ -142,6 +164,9 @@ public class TypeWriter : MonoBehaviour
 
 	private IEnumerator WriteTextCoroutine (string typeMessage) 
 	{
+		finalMessage = typeMessage;
+		currTypeMessage = "";
+
 		int typeIndex = 0;
 		char[] typeMessageChars = typeMessage.ToCharArray ();
 
@@ -152,9 +177,11 @@ public class TypeWriter : MonoBehaviour
 			char letter = typeMessageChars [typeIndex];
 			if (letter != ' ' || writerMode == WriterMode.Normal)
 			{
-				TypeText.text += letter;
+				currTypeMessage += letter;
 				SetTextStatusColor(TypeStatus.Normal);
 			}
+
+			TypeText.text = currTypeMessage + "|";
 
 			if (TypeSounds != null) 
 			{
@@ -164,6 +191,8 @@ public class TypeWriter : MonoBehaviour
 
 			yield return new WaitForSeconds (typePauseDuration);
 		}
+
+		TypeText.text = currTypeMessage + "|";
 
 		isWriting = false;
 	}

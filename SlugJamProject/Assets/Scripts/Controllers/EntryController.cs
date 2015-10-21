@@ -1,5 +1,7 @@
 using UnityEngine;
+using System.Collections.Generic;
 using System.Collections;
+using System.Threading.Tasks;
 
 using Parse;
 
@@ -9,7 +11,15 @@ public class EntryController : Controller, InputManager.InputListener
 	{
 		Normal,
 		LoggedIn,
-		Offline
+		Offline,
+		Error
+	}
+
+	private enum ErrorType
+	{
+		Unknown,
+		ParseInternal,
+		ParseException
 	}
 
 	public TypeWriter Writer;
@@ -20,6 +30,9 @@ public class EntryController : Controller, InputManager.InputListener
 	// internal data
 	private EntryState entryState;
 
+	private ParseException.ErrorCode currentErrorCode;
+	private ErrorType currentErrorType;
+
 	protected override void Awake() 
 	{
 		base.Awake ();
@@ -29,16 +42,9 @@ public class EntryController : Controller, InputManager.InputListener
 
 	private void Start()
 	{
-		if (ParseUser.CurrentUser != null) 
-		{
-			PromptLoggedIn();
-		} 
-		else 
-		{
-			PromptNormal();
-		}
+		PromptStart ();
 	}
-	
+
 	public void OnTouchBegin()
 	{
 	}
@@ -48,7 +54,20 @@ public class EntryController : Controller, InputManager.InputListener
 		if (!isActive)
 			return;
 
-		StartCoroutine(GoToLevelCoroutine(GoLevelName));
+		switch (entryState) 
+		{
+		case EntryState.Normal:
+			GameManager.Instance.IsOnline = false;
+			StartCoroutine(GoToLevelCoroutine(GoLevelName));
+			break;
+		case EntryState.LoggedIn:
+			GameManager.Instance.IsOnline = true;
+			StartCoroutine(GoToLevelCoroutine(GoLevelName));
+			break;
+		case EntryState.Error:
+			PromptStart();
+			break;
+		}
 	}
 
 	public void OnHold()
@@ -59,6 +78,11 @@ public class EntryController : Controller, InputManager.InputListener
 		switch (entryState) 
 		{
 			case EntryState.LoggedIn:
+				PlayerPrefs.SetString(ParseUserUtils.KEY_CACHED_ID, "");
+				PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, 0);
+				PlayerPrefs.SetInt (ParseUserUtils.KEY_DAILY_STREAK, 0);
+				PlayerPrefs.SetString(ParseUserUtils.KEY_DAILY_TIMESTAMP, System.DateTime.UtcNow.ToBinary().ToString());
+				PlayerPrefs.Save();
 				ParseUser.LogOutAsync();
 				PromptNormal();
 				
@@ -66,6 +90,18 @@ public class EntryController : Controller, InputManager.InputListener
 			case EntryState.Normal:
 				StartCoroutine (GoToLevelCoroutine(LoginLevelName));
 			break;
+		}
+	}
+
+	private void PromptStart()
+	{
+		if (ParseUser.CurrentUser != null) 
+		{
+			StartCoroutine(FetchCoroutine());
+		} 
+		else 
+		{
+			PromptNormal();
 		}
 	}
 
@@ -82,6 +118,60 @@ public class EntryController : Controller, InputManager.InputListener
 		entryState = EntryState.Normal;
 		Writer.WriteTextInstant ("[Tap] to play offline\n" +
 		                         "[Hold] to login or signup\n");
+	}
+
+	private IEnumerator FetchCoroutine()
+	{
+		Writer.WriteTextInstant ("Fetching...");
+		
+		Task<ParseUser> fetchTask = ParseUser.CurrentUser.FetchIfNeededAsync ();
+		
+		while (!fetchTask.IsCompleted) yield return null;
+		
+		if (fetchTask.IsFaulted || fetchTask.IsCanceled)
+		{
+			using (IEnumerator<System.Exception> enumerator = fetchTask.Exception.InnerExceptions.GetEnumerator()) 
+			{
+				if (enumerator.MoveNext()) 
+				{
+					ParseException exception = (ParseException) enumerator.Current;
+					currentErrorCode = exception.Code;
+					currentErrorType = ErrorType.ParseException;
+				}
+				else
+				{
+					currentErrorType = ErrorType.ParseInternal;
+				}
+			}
+			
+			entryState = EntryState.Error;
+		}
+		
+		// we're done, what did we get?
+		if (entryState != EntryState.Error) 
+		{
+			PromptLoggedIn();
+		}
+		else
+		{
+			string errorStr = "Unknown error";
+			
+			switch(currentErrorType)
+			{
+			case ErrorType.ParseInternal:
+				errorStr = "Server error";
+				break;
+			case ErrorType.ParseException:
+				if(MessageBook.ParseExceptionMap.ContainsKey(currentErrorCode))
+					errorStr = MessageBook.ParseExceptionMap[currentErrorCode];
+				else
+					errorStr = currentErrorCode + "";
+				break;
+			}
+			
+			Writer.WriteTextInstant(errorStr + "\n" +
+			                        "[Tap] to refresh\n");
+		}
 	}
 
 	/// <summary>

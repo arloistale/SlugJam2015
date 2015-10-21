@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System.IO;
 using System;
 using System.Linq;
 using System.Collections;
@@ -34,8 +35,7 @@ public class LeaderboardController : Controller, InputManager.InputListener
 	// const data
 	public const int PAGINATION_AMOUNT = 10;
 	
-	// type data
-	public TypeWriter HeaderWriter;
+	// modules data
 	public TypeWriter ListingWriter;
 	public TypeWriter AsyncWriter;
 
@@ -44,6 +44,8 @@ public class LeaderboardController : Controller, InputManager.InputListener
 	private List<ParseUser> todayUsers;
 	
 	// internal data
+	private LeaderboardListener leaderboardListener;
+
 	private LeaderboardPage leaderboardPage;
 	private PageState overallPageState;
 	private PageState todayPageState;
@@ -70,6 +72,18 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		StartCoroutine (FetchCoroutine ());
 
 		PromptToday ();
+
+		if(leaderboardListener != null) leaderboardListener.OnLeaderboardActivate ();
+	}
+
+	public void End()
+	{
+		isActive = false;
+
+		AsyncWriter.ClearWriting ();
+		ListingWriter.ClearWriting ();
+
+		if(leaderboardListener != null) leaderboardListener.OnLeaderboardEnd ();
 	}
 
 	public void OnTouchBegin()
@@ -89,13 +103,13 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		switch (leaderboardPage) 
 		{
 		case LeaderboardPage.Overall:
-			PromptToday();
-			break;
-		case LeaderboardPage.Today:
 			PromptOptions();
 			break;
-		case LeaderboardPage.Options:
+		case LeaderboardPage.Today:
 			PromptOverall();
+			break;
+		case LeaderboardPage.Options:
+			PromptToday();
 			break;
 		}
 	}
@@ -111,15 +125,18 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		switch (leaderboardPage) 
 		{
 		case LeaderboardPage.Overall:
-			//PromptToday();
 			break;
 		case LeaderboardPage.Today:
-			//PromptOptions();
 			break;
 		case LeaderboardPage.Options:
-			// end
+			End ();
 			break;
 		}
+	}
+
+	public void SetListener(LeaderboardListener listener)
+	{
+		leaderboardListener = listener;
 	}
 	
 	private void PromptOverall()
@@ -129,10 +146,10 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		if (overallPageState == PageState.Ready) 
 		{
 			AsyncWriter.ClearWriting();
-			HeaderWriter.WriteTextInstant("Top Overall\n" +
-			                              "[Tap] to cycle");
 
-			ListingWriter.WriteTextInstant(GetStreakListing(overallUsers));
+			ListingWriter.WriteTextInstant("Top Overall\n" +
+			                               "[Tap] to cycle\n\n" +
+			                               GetStreakListing(overallUsers));
 		}
 		else if (overallPageState == PageState.Fetching) 
 		{
@@ -168,10 +185,9 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		{
 			AsyncWriter.ClearWriting();
 
-			HeaderWriter.WriteTextInstant("Top Today\n" +
-			                              "[Tap] to cycle");
-
-			ListingWriter.WriteTextInstant(GetStreakListing(todayUsers));
+			ListingWriter.WriteTextInstant("Top Today\n" +
+			                               "[Tap] to cycle\n\n" +
+			                               GetDailyStreakListing(todayUsers));
 		}
 		else if (todayPageState == PageState.Fetching)
 		{
@@ -202,6 +218,11 @@ public class LeaderboardController : Controller, InputManager.InputListener
 	private void PromptOptions()
 	{
 		leaderboardPage = LeaderboardPage.Options;
+
+		ListingWriter.ClearWriting ();
+		AsyncWriter.WriteTextInstant ("Options\n" +
+		                              "[Tap] to cycle\n" +
+		                              "[Hold] to return");
 	}
 
 	private IEnumerator FetchCoroutine()
@@ -255,8 +276,9 @@ public class LeaderboardController : Controller, InputManager.InputListener
 
 		// now we load and cache todays high scores
 		ParseQuery<ParseUser> todayQuery = ParseUser.Query.
-			WhereGreaterThan(ParseUserUtils.KEY_STREAK, 0).
-			OrderByDescending (ParseUserUtils.KEY_STREAK).
+			WhereGreaterThanOrEqualTo(ParseUserUtils.KEY_DAILY_TIMESTAMP, DateTime.UtcNow.Date).
+			WhereGreaterThan(ParseUserUtils.KEY_DAILY_STREAK, 0).
+			OrderByDescending (ParseUserUtils.KEY_DAILY_STREAK).
 			Limit (PAGINATION_AMOUNT);
 		
 		Task<IEnumerable<ParseUser>> todayTask = todayQuery.FindAsync ();
@@ -296,17 +318,59 @@ public class LeaderboardController : Controller, InputManager.InputListener
 
 	private string GetStreakListing(List<ParseUser> users)
 	{
+		if (users.Count == 0)
+			return "Oh boy, it's empty!";
+
+		ParseUser currentUser = ParseUser.CurrentUser;
 		string listingStr = "";
-		
-		for(int i = 0; i < users.Count; i++)
+
+		for(int i = 0; i < PAGINATION_AMOUNT; i++)
 		{
-			listingStr += String.Format("{0,-5} {1,-12} {2,5}", (i + 1) + ".", 
-			                            users[i].Username, users[i].Get<int>(ParseUserUtils.KEY_STREAK));
+			if(i < users.Count)
+			{
+				listingStr += String.Format("{0,-3} {1,-14} {2,4}", (i + 1) + ".", 
+				                            (currentUser.ObjectId != users[i].ObjectId) ? users[i].Username : ("*" + users[i].Username + "*"), 
+				                            users[i].Get<int>(ParseUserUtils.KEY_STREAK));
+			}
 			
-			if(i < (users.Count - 1))
+			if(i < PAGINATION_AMOUNT - 1)
+			{
 				listingStr += "\n";
+			}
 		}
 		
 		return listingStr;
+	}
+
+	private string GetDailyStreakListing(List<ParseUser> users)
+	{
+		if (users.Count == 0)
+			return "Oh boy, it's empty!";
+
+		ParseUser currentUser = ParseUser.CurrentUser;
+		string listingStr = "";
+		
+		for(int i = 0; i < PAGINATION_AMOUNT; i++)
+		{
+			if(i < users.Count)
+			{
+				listingStr += String.Format("{0,-3} {1,-14} {2,4}", (i + 1) + ".", 
+				                            (currentUser.ObjectId != users[i].ObjectId) ? users[i].Username : ("*" + users[i].Username + "*"), 
+				                            users[i].Get<int>(ParseUserUtils.KEY_DAILY_STREAK));
+			}
+			
+			if(i < PAGINATION_AMOUNT - 1)
+			{
+				listingStr += "\n";
+			}
+		}
+		
+		return listingStr;
+	}
+
+	public interface LeaderboardListener
+	{
+		void OnLeaderboardActivate();
+		void OnLeaderboardEnd();
 	}
 }

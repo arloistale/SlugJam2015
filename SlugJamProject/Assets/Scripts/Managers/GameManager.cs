@@ -11,14 +11,20 @@ using Parse;
 /// </summary>
 public class GameManager : PersistentSingleton<GameManager>
 {
+	/// current tier
+	public Tier Tier { get; set; }
 	/// the streak value
-	public int Streak { get; private set; }
+	public int Streak { get; set; }
 	/// the high streak value
-	public int HighStreak { get; private set; }
+	public int HighStreak { get; set; }
+	/// the daily streak value
+	public int DailyStreak { get; set; }
+	/// the daily streak timestamp
+	public DateTime DailyTimestamp { get; set; }
 	// the current controller
 	public MainController Controller { get; set; }
 	/// whether the game is online or offline
-	public bool IsOnline { get { return ParseUser.CurrentUser != null; } } 
+	public bool IsOnline { get; set; } 
 
 	public override void Awake()
 	{
@@ -27,36 +33,15 @@ public class GameManager : PersistentSingleton<GameManager>
 		GameObject controllerObject = GameObject.FindGameObjectWithTag ("MainController");
 		Controller = controllerObject.GetComponent<MainController> ();
 	}
-	
+
 	/// <summary>
 	/// this method resets the whole game manager
 	/// </summary>
 	public void Reset()
 	{
 		Streak = 0;
-	}
-	
-	/// <summary>
-	/// Adds specified amount to the streak.
-	/// </summary>
-	public void AddStreak(int value)
-	{
-		Streak = Mathf.Max(0, value + Streak);
-	}
-	
-	/// <summary>
-	/// Sets the streak.
-	/// </summary>
-	public void SetStreak(int value)
-	{
-		Streak = value;
-	}
-
-	/// <summary>
-	/// Sets the high streak.
-	/// </summary>
-	public void SetHighStreak(int value)
-	{
-		HighStreak = value;
+		HighStreak = 0;
+		DailyStreak = 0;
+		DailyTimestamp = DateTime.Now;
 	}
 }
