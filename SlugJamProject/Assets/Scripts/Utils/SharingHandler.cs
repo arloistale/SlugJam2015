@@ -97,7 +97,7 @@ public class SharingHandler : MonoBehaviour
 	{
 		#if UNITY_IPHONE || UNITY_IPAD
 
-		GeneralSharingiOSBridge.ShareTextWithImage (fullDestination, "Check out my streak in S.pace!");
+		SharingiOSBridge.ShareTextWithImage (fullDestination, "Check out my streak in S.pace!");
 
 		#endif
 
