@@ -19,7 +19,6 @@
     }
     else
         [[UIApplication sharedApplication].keyWindow.rootViewController presentViewController:activityVc animated:YES completion:nil];
-    [activityVc release];
 }
 
 @end
@@ -28,6 +27,5 @@ extern "C" {
     void _TAG_ShareTextWithImage(const char * path, const char * message) {
         ViewController *vc = [[ViewController alloc] init];
         [vc shareMethod:path Message:message];
-        [vc release];
     }
 }

@@ -249,7 +249,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak +
 		                        "\nHighest: " + GameManager.Instance.HighStreak + 
 		                        "\n[Tap] to return" +
-		                        (GameManager.Instance.IsOnline ? "\n[Hold] to share" : ""));
+		                        "\n[Hold] to share");
 	}
 
 	private IEnumerator InstructionsCoroutine()

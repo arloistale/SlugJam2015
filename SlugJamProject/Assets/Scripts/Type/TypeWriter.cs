@@ -138,7 +138,7 @@ public class TypeWriter : MonoBehaviour
 		if(currTypeMessage != finalMessage)
 			currTypeMessage += ' ';
 
-		TypeText.text = currTypeMessage;
+		TypeText.text = currTypeMessage + "|";
 	}
 
 	public void SetTypeDuration(float duration)

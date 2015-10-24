@@ -82,10 +82,12 @@ public class LoginController : Controller, InputManager.InputListener
 		switch (loginState)
 		{
 			case LoginState.Username:
-				SubmitUsername(UsernameField.text);
+				if(!TouchScreenKeyboard.visible)
+					SubmitUsername(UsernameField.text);
 				break;
 			case LoginState.Password:
-				SubmitPasswordAuth(PasswordField.text);
+				if(!TouchScreenKeyboard.visible)
+					SubmitPasswordAuth(PasswordField.text);
 				break;
 			case LoginState.Error:
 				PromptUsername ();
@@ -126,8 +128,8 @@ public class LoginController : Controller, InputManager.InputListener
 		UsernameCanvasGroup.blocksRaycasts = true;
 		UsernameCanvasGroup.interactable = true;
 
+		currUsernameStr = "";
 		UsernameField.text = "";
-		
 		EventSystem.current.SetSelectedGameObject(UsernameField.gameObject, null);
 	}
 	
@@ -167,7 +169,7 @@ public class LoginController : Controller, InputManager.InputListener
 
 	private void SubmitPasswordAuth(string passwordStr)
 	{
-		if (passwordStr.Length == 0) 
+		if (currUsernameStr.Length == 0 || passwordStr.Length == 0) 
 		{
 			PromptPassword();
 			return;
@@ -183,6 +185,26 @@ public class LoginController : Controller, InputManager.InputListener
 		AsyncWriter.RepeatText ("...");
 
 		StartCoroutine (AuthCoroutine (currUsernameStr, passwordStr));
+	}
+
+	private void SubmitPasswordRegister(string passwordStr)
+	{
+		if (currUsernameStr.Length == 0 || passwordStr.Length == 0) 
+		{
+			PromptPassword();
+			return;
+		}
+
+		loginState = LoginState.Registering;
+		
+		PasswordCanvasGroup.alpha = 0;
+		PasswordCanvasGroup.blocksRaycasts = false;
+		PasswordCanvasGroup.interactable = false;
+		
+		Writer.ClearWriting ();
+		AsyncWriter.RepeatText ("...");
+		
+		StartCoroutine (RegisterCoroutine (currUsernameStr, passwordStr));
 	}
 
 	private IEnumerator AuthCoroutine(string usernameStr, string passwordStr)
@@ -238,20 +260,6 @@ public class LoginController : Controller, InputManager.InputListener
 			AsyncWriter.WriteTextInstant(errorStr + "\n" +
 			                             "[Tap] to return\n");
 		}
-	}
-
-	private void SubmitPasswordRegister(string passwordStr)
-	{
-		loginState = LoginState.Registering;
-
-		PasswordCanvasGroup.alpha = 0;
-		PasswordCanvasGroup.blocksRaycasts = false;
-		PasswordCanvasGroup.interactable = false;
-
-		Writer.ClearWriting ();
-		AsyncWriter.RepeatText ("...");
-
-		StartCoroutine (RegisterCoroutine (currUsernameStr, passwordStr));
 	}
 
 	private IEnumerator RegisterCoroutine(string usernameStr, string passwordStr)

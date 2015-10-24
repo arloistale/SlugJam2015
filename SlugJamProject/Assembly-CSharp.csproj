@@ -62,14 +62,12 @@
      <Compile Include="Assets\Scripts\Managers\SoundManager.cs" />
      <Compile Include="Assets\Scripts\Type\TypeWriter.cs" />
      <Compile Include="Assets\Scripts\Utils\Gaussian.cs" />
+     <Compile Include="Assets\Scripts\Utils\OptionsHandler.cs" />
      <Compile Include="Assets\Scripts\Utils\ParseUserUtils.cs" />
      <Compile Include="Assets\Scripts\Utils\SharingHandler.cs" />
      <Compile Include="Assets\Scripts\Utils\SharingiOSBridge.cs" />
      <None Include="Assets\Parse\Parse.Unity.xml" />
      <None Include="Assets\link.xml" />
- <Reference Include="UnityEngine.Advertisements">
- <HintPath>/Applications/Unity/Unity.app/Contents/UnityExtensions/Unity/Advertisements/UnityEngine.Advertisements.dll</HintPath>
- </Reference>
  <Reference Include="UnityEngine.UI">
  <HintPath>/Applications/Unity/Unity.app/Contents/UnityExtensions/Unity/GUISystem/UnityEngine.UI.dll</HintPath>
  </Reference>
