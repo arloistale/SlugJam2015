@@ -9,17 +9,12 @@ public class OptionsHandler
 	
 	private List<string> optionLabels = new List<string>();
 	
-	public OptionsHandler()
+	public OptionsHandler(List<string> labels)
 	{
 		selectedIndex = 0;
-		Next ();
-	}
-	
-	public void FeedOptions(List<string> labels)
-	{
-		Reset ();
 		optionLabels.Clear ();
 		optionLabels = labels;
+		SelectNextText ();
 	}
 	
 	public void Reset()
@@ -30,49 +25,24 @@ public class OptionsHandler
 	public void Next()
 	{
 		selectedIndex = (selectedIndex + 1) % optionLabels.Count;
+		optionText = "";
+		SelectNextText ();
+	}
 
+	private void SelectNextText(){
 		for (int i = 0; i < optionLabels.Count; i++)
 		{
-
+			if(i == selectedIndex) optionText += ("*" + optionLabels[i] + "*");
+			else optionText += optionLabels[i];
+			
+			optionText += "\n";
 		}
 	}
-/*
-	private string GetOptionsStr()
-	{
-		if (GameManager.Instance.IsOnline) 
-		{
-			optionsIndex = optionIndex;
-			
-			if (optionsIndex > 2) 
-			{
-				optionsIndex = 0;
-			}
-			
-			switch (optionsIndex) 
-			{
-			case 0:
-				optionText = ">Continue<\nLeaderboard\nOptions";
-				break;
-			case 1:
-				optionText = "Continue\n>Leaderboard<\nOptions";
-				break;
-			case 2:
-				optionText = "Continue\nLeaderboard\n>Options<";
-				break;
-			default:
-				optionText = ">Continue<\nLeaderboard\nOptions";
-				break;
-			}
-		}
-		else 
-		{
-			optionText = "\n[Tap] to continue\n[Hold] for start screen";
-		}
-	}*/
 
-	public string GetOptionLabel(int index)
+	public string GetOptionListString()
 	{
-		return optionLabels [index];
+
+		return optionText;
 	}
 
 	public int GetSelectedIndex()
