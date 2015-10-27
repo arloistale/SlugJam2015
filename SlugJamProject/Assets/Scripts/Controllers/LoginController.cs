@@ -20,78 +20,78 @@ public class LoginController : Controller, InputManager.InputListener
 		Error,
 		Ready
 	}
-
+	
 	private enum ErrorType
 	{
 		Unknown,
 		ParseInternal,
 		ParseException
 	}
-
+	
 	// type data
 	public TypeWriter Writer;
 	public TypeWriter AsyncWriter;
-
+	
 	// level data
 	public string CancelLevelName;
 	public string GoLevelName;
-
+	
 	// input data
 	public CanvasGroup UsernameCanvasGroup;
 	public CanvasGroup PasswordCanvasGroup;
 	public InputField UsernameField;
 	public InputField PasswordField;
-
+	
 	// internal
 	private LoginState loginState;
 	private ErrorType currentErrorType;
 	private ParseException.ErrorCode currentErrorCode;
-
+	
 	private string currUsernameStr;
-
+	
 	protected override void Awake()
 	{
 		base.Awake ();
-
+		
 		InputManager.Instance.SetInputListener (this);
 	}
-
+	
 	private void Start()
 	{
 		PromptUsername ();
 	}
-
+	
 	void OnApplicationFocus()
 	{
 		if(loginState == LoginState.Username)
 			EventSystem.current.SetSelectedGameObject(UsernameField.gameObject, null);
-
+		
 		if(loginState == LoginState.Password)
 			EventSystem.current.SetSelectedGameObject(PasswordField.gameObject, null);
 	}
-
+	
 	public void OnTouchBegin()
 	{
 	}
-
+	
 	public void OnTap()
 	{
 		if (!isActive)
 			return;
-
+		
 		switch (loginState)
 		{
-			case LoginState.Username:
-				if(!TouchScreenKeyboard.visible)
-					SubmitUsername(UsernameField.text);
-				break;
-			case LoginState.Password:
-				if(!TouchScreenKeyboard.visible)
-					SubmitPasswordAuth(PasswordField.text);
-				break;
-			case LoginState.Error:
-				PromptUsername ();
-				break;
+		case LoginState.Username:
+			if(!TouchScreenKeyboard.visible)
+				SubmitUsername(UsernameField.text);
+			break;
+		case LoginState.Password:
+			if(!TouchScreenKeyboard.visible)
+				SubmitPasswordAuth(PasswordField.text);
+			break;
+		case LoginState.Error:
+			PromptUsername ();
+			break;
 		}
 	}
 	
@@ -99,35 +99,35 @@ public class LoginController : Controller, InputManager.InputListener
 	{
 		if (!isActive)
 			return;
-
+		
 		switch (loginState)
 		{
-			case LoginState.Username:
-				GoToLevel(CancelLevelName);
-				break;
-			case LoginState.Password:
-				SubmitPasswordRegister(PasswordField.text);
-				break;
+		case LoginState.Username:
+			GoToLevel(CancelLevelName);
+			break;
+		case LoginState.Password:
+			SubmitPasswordRegister(PasswordField.text);
+			break;
 		}
 	}
-
+	
 	private void PromptUsername()
 	{
 		AsyncWriter.ClearWriting ();
-
+		
 		loginState = LoginState.Username;
-
+		
 		Writer.WriteTextInstant ("[Tap] to continue\n" +
 		                         "[Hold] to cancel\n" +
 		                         "Enter username");
-
+		
 		PasswordCanvasGroup.alpha = 0;
 		PasswordCanvasGroup.blocksRaycasts = false;
 		PasswordCanvasGroup.interactable = false;
 		UsernameCanvasGroup.alpha = 1;
 		UsernameCanvasGroup.blocksRaycasts = true;
 		UsernameCanvasGroup.interactable = true;
-
+		
 		currUsernameStr = "";
 		UsernameField.text = "";
 		EventSystem.current.SetSelectedGameObject(UsernameField.gameObject, null);
@@ -136,25 +136,25 @@ public class LoginController : Controller, InputManager.InputListener
 	private void PromptPassword()
 	{
 		AsyncWriter.ClearWriting ();
-
+		
 		loginState = LoginState.Password;
-
+		
 		Writer.WriteTextInstant ("[Tap] to login\n" +
 		                         "[Hold] to signup\n" +
 		                         "Enter password");
-
+		
 		UsernameCanvasGroup.alpha = 0;
 		UsernameCanvasGroup.blocksRaycasts = false;
 		UsernameCanvasGroup.interactable = false;
 		PasswordCanvasGroup.alpha = 1;
 		PasswordCanvasGroup.blocksRaycasts = true;
 		PasswordCanvasGroup.interactable = true;
-
+		
 		PasswordField.text = "";
-
+		
 		EventSystem.current.SetSelectedGameObject(PasswordField.gameObject, null);
 	}
-
+	
 	private void SubmitUsername(string usernameStr)
 	{
 		if (usernameStr.Length == 0) 
@@ -162,11 +162,11 @@ public class LoginController : Controller, InputManager.InputListener
 			PromptUsername();
 			return;
 		}
-
+		
 		currUsernameStr = usernameStr;
 		PromptPassword();
 	}
-
+	
 	private void SubmitPasswordAuth(string passwordStr)
 	{
 		if (currUsernameStr.Length == 0 || passwordStr.Length == 0) 
@@ -174,19 +174,19 @@ public class LoginController : Controller, InputManager.InputListener
 			PromptPassword();
 			return;
 		}
-
+		
 		loginState = LoginState.Authing;
-
+		
 		PasswordCanvasGroup.alpha = 0;
 		PasswordCanvasGroup.blocksRaycasts = false;
 		PasswordCanvasGroup.interactable = false;
-
+		
 		Writer.ClearWriting ();
 		AsyncWriter.RepeatText ("...");
-
+		
 		StartCoroutine (AuthCoroutine (currUsernameStr, passwordStr));
 	}
-
+	
 	private void SubmitPasswordRegister(string passwordStr)
 	{
 		if (currUsernameStr.Length == 0 || passwordStr.Length == 0) 
@@ -194,7 +194,7 @@ public class LoginController : Controller, InputManager.InputListener
 			PromptPassword();
 			return;
 		}
-
+		
 		loginState = LoginState.Registering;
 		
 		PasswordCanvasGroup.alpha = 0;
@@ -206,7 +206,7 @@ public class LoginController : Controller, InputManager.InputListener
 		
 		StartCoroutine (RegisterCoroutine (currUsernameStr, passwordStr));
 	}
-
+	
 	private IEnumerator AuthCoroutine(string usernameStr, string passwordStr)
 	{
 		Task<ParseUser> authTask = ParseUser.LogInAsync (usernameStr, passwordStr);
@@ -261,7 +261,7 @@ public class LoginController : Controller, InputManager.InputListener
 			                             "[Tap] to return\n");
 		}
 	}
-
+	
 	private IEnumerator RegisterCoroutine(string usernameStr, string passwordStr)
 	{
 		IDictionary<string, object> userInfo = new Dictionary<string, object>
@@ -271,7 +271,7 @@ public class LoginController : Controller, InputManager.InputListener
 		};
 		Task<IDictionary<string, object>> registerTask = 
 			ParseCloud.CallFunctionAsync<IDictionary<string, object>> ("SignUpCloud", userInfo);
-
+		
 		while (!registerTask.IsCompleted) 
 		{
 			yield return null;
@@ -313,12 +313,12 @@ public class LoginController : Controller, InputManager.InputListener
 				if(result.TryGetValue("token", out token))
 				{
 					Task<ParseUser> becomeTask = ParseUser.BecomeAsync((string) token);
-
+					
 					while(!becomeTask.IsCompleted)
 					{
 						yield return null;
 					}
-
+					
 					if (becomeTask.IsFaulted || becomeTask.IsCanceled)
 					{
 						using (IEnumerator<System.Exception> enumerator = becomeTask.Exception.InnerExceptions.GetEnumerator()) 
@@ -344,7 +344,7 @@ public class LoginController : Controller, InputManager.InputListener
 				}
 			}
 		}
-
+		
 		// we're done, what did we get?
 		if (loginState == LoginState.Ready) 
 		{
@@ -372,19 +372,19 @@ public class LoginController : Controller, InputManager.InputListener
 			                             "[Tap] to return\n");
 		}
 	}
-
+	
 	public void GoToLevel(string levelName)
 	{
 		StartCoroutine(GoToLevelCoroutine(levelName));
 	}
-
+	
 	/// <summary>
 	/// Waits for a short time and then loads the specified level
 	/// </summary>
 	private IEnumerator GoToLevelCoroutine(string levelName)
 	{
 		isActive = false;
-
+		
 		if (!string.IsNullOrEmpty(levelName))
 			Application.LoadLevel(levelName);
 		

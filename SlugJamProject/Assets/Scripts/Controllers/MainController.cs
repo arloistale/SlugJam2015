@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 using Parse;
 
-public class MainController : Controller, InputManager.InputListener, LeaderboardController.LeaderboardListener
+public class MainController : Controller, InputManager.InputListener, LeaderboardController.LeaderboardListener, OptionsController.OptionsListener
 {
 	private enum MainState
 	{
@@ -17,7 +17,8 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		Game,
 		End,
 		SyncError,
-		Options
+		Options,
+		Difficulty
 	}
 	
 	private enum ErrorType
@@ -26,13 +27,28 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		ParseInternal,
 		ParseException
 	}
-	
+
+	private enum DifficultyState
+	{
+		Easy,
+		Normal,
+		Hard,
+		Dynamic
+	}
+
+	// const data
+	private const int SELECTION_GAME = 0;
+	private const int SELECTION_LEADERBOARD = 1;
+	private const int SELECTION_DIFFICULTY = 2;
+	private const int SELECTION_OPTIONS = 3;
+
 	// data data
 	public PhraseBook PhraseBook;
 	public TierBook TierBook;
 	
 	// modular data
 	public LeaderboardController LeaderboardController;
+	public OptionsController OptionsController;
 	public SharingHandler SharingHandler;
 	
 	// type data
@@ -42,14 +58,14 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	
 	// internal data
 	private int SCORE_MAX = 8192;
-	
-	private MainState lastState;
+
 	private MainState mainState;
 	private ErrorType currentErrorType;
-	private OptionsHandler OptionsHandler;
+	private SelectionHandler selectionHandler;
 	private ParseException.ErrorCode currentErrorCode;
 	
 	private bool isSyncing;
+	private DifficultyState difficultyState;
 	
 	private bool didTap;
 	
@@ -59,8 +75,13 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		
 		InputManager.Instance.SetInputListener (this);
 		LeaderboardController.SetListener (this);
+		OptionsController.SetListener (this);
+
+		if(GameManager.Instance.IsOnline)
+			selectionHandler = new SelectionHandler (new List<string> () {"Continue", "Leaderboard", "Difficulty: " + difficultyState, "Options"});
+		else
+			selectionHandler = new SelectionHandler (new List<string> () {"Continue", "Difficulty: " + difficultyState, "Return to Intro"});
 		
-		OptionsHandler = new OptionsHandler (new List<string> () {"Continue", "Leaderboard", "Options"});
 	}
 	
 	private void Start()
@@ -137,7 +158,10 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	
 	public void OnTouchBegin()
 	{
-		if (!isActive && !isSyncing && !LeaderboardController.IsActive())
+		if (!isActive)
+			return;
+
+		if(isSyncing || LeaderboardController.IsActive() || SharingHandler.isSharing || OptionsController.IsActive())
 			return;
 		
 		if (Writer.GetMode () == TypeWriter.WriterMode.CullSpaces && Writer.isWriting) 
@@ -152,7 +176,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		if (!isActive)
 			return;
 		
-		if(isSyncing || LeaderboardController.IsActive() || SharingHandler.isSharing)
+		if(isSyncing || LeaderboardController.IsActive() || SharingHandler.isSharing || OptionsController.IsActive())
 			return;
 		
 		didTap = true;
@@ -160,26 +184,18 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		switch (mainState) 
 		{
 		case MainState.Intro:
-			OptionsHandler.Next();
-			
-			if(GameManager.Instance.IsOnline)
-				PromptIntro();
-			else
-				PromptGame();
-			
+			selectionHandler.Next();
+			PromptIntro();
 			break;
-		case MainState.Options:
-			OptionsHandler.Next();
-			PromptOptions();
+		case MainState.Difficulty:
+			selectionHandler.Next();
+			PromptDifficulty();
 			break;
 		case MainState.End:
 			PromptIntro();
 			break;
 		case MainState.SyncError:
-			if(lastState == MainState.End)
-				PromptEnd();
-			else
-				PromptIntro();
+			PromptIntro();
 			break;
 		}
 	}
@@ -189,49 +205,83 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		if (!isActive)
 			return;
 		
-		if(isSyncing || LeaderboardController.IsActive() || SharingHandler.isSharing)
+		if(isSyncing || LeaderboardController.IsActive() || SharingHandler.isSharing || OptionsController.IsActive())
 			return;
-		
+
 		switch (mainState) 
 		{
 		case MainState.Intro:
-			if(GameManager.Instance.IsOnline){
-				if(OptionsHandler.GetSelectedIndex() == 0){
-					PromptGame();
-				}
-				else if(OptionsHandler.GetSelectedIndex() == 1){
-					StartCoroutine(LeaderboardCoroutine());
-				}
-				else if(OptionsHandler.GetSelectedIndex() == 2){
-					OptionsHandler = new OptionsHandler (new List<string> () {"Change UserName", "Change Password", "Logout " + ParseUser.CurrentUser.Username, "Main Menu"});
-					PromptOptions();
+			if(GameManager.Instance.IsOnline)
+			{
+				switch(selectionHandler.GetSelectedIndex())
+				{
+					case SELECTION_GAME:
+						PromptGame();
+						break;
+					case SELECTION_LEADERBOARD:
+						StartCoroutine(LeaderboardCoroutine());
+						break;
+					case SELECTION_DIFFICULTY:
+						selectionHandler = new SelectionHandler (new List<string> () {"Easy", "Normal", "Hard", "Dynamic", "Main Menu"});
+						PromptDifficulty();
+						break;
+					case SELECTION_OPTIONS:
+						Writer.ClearWriting();
+						OptionsController.Activate();
+						break;
 				}
 			}
 			else{
-				Application.LoadLevel ("Bootstrap");
+				switch(selectionHandler.GetSelectedIndex())
+				{
+					case 0:
+						PromptGame();
+						break;
+					case 1:
+						selectionHandler = new SelectionHandler (new List<string> () {"Easy", "Normal", "Hard", "Dynamic", "Main Menu"});
+						PromptDifficulty();
+						break;
+					case 2:
+						Application.LoadLevel("Bootstrap");
+						break;
+				}
 			}
 			
 			break;
-		case MainState.Options:
-			if(OptionsHandler.GetSelectedIndex() == 0){
-				print("username change");
+		case MainState.Difficulty:
+			switch(selectionHandler.GetSelectedIndex())
+			{
+				case 0:
+					difficultyState = DifficultyState.Easy;
+					break;
+				case 1:
+					difficultyState = DifficultyState.Normal;
+					break;
+				case 2:
+					difficultyState = DifficultyState.Hard;
+					break;
+				case 3:
+					difficultyState = DifficultyState.Dynamic;
+					break;
+				case 4:
+					break;
 			}
-			else if(OptionsHandler.GetSelectedIndex() == 1){
-				print("password change");
-			}
-			else if(OptionsHandler.GetSelectedIndex() == 2){
-				//logout here don't force them to logout on next page
-				Application.LoadLevel ("Bootstrap");
-			}
-			else if(OptionsHandler.GetSelectedIndex() == 3){
-				OptionsHandler = new OptionsHandler (new List<string> () {"Continue", "Leaderboard", "Options"});
-				PromptIntro();
-			}
+			selectionHandler = new SelectionHandler (setMainMenu());
+			PromptIntro();
 			break;
 		case MainState.End:
 			SharingHandler.Share();
 			break;
 		}
+	}
+
+	private List<string> setMainMenu(){
+		List<string> temp;
+		if(GameManager.Instance.IsOnline)
+			temp = new List<string> () {"Continue", "Leaderboard", "Difficulty: " + difficultyState, "Options"};
+		else
+			temp = new List<string> () {"Continue", "Difficulty: " + difficultyState, "Options"};
+		return temp;
 	}
 	
 	public void OnLeaderboardActivate() {}
@@ -249,10 +299,17 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			break;
 		}
 	}
+
+	public void OnOptionsActivate() {}
+
+	public void OnOptionsEnd()
+	{
+		InputManager.Instance.SetInputListener (this);
+		PromptIntro();
+	}
 	
 	private void PromptIntro()
 	{
-		lastState = mainState;
 		mainState = MainState.Intro;
 		
 		string greetingMessage = (GameManager.Instance.HighStreak > 0) ? 
@@ -260,12 +317,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 		string choiceMessage = "";
 
-		if (GameManager.Instance.IsOnline) {
-			choiceMessage = "\n[Tap] to cycle \n[Hold] to select\n" + OptionsHandler.GetOptionListString();
-		}
-		else{
-			choiceMessage = "\n[Tap] to continue\n[Hold] for login";
-		}
+		choiceMessage = "\n[Tap] to cycle \n[Hold] to select\n-----------------\n" + selectionHandler.GetOptionListString();
 		
 		Writer.WriteTextInstant (greetingMessage + choiceMessage);
 		
@@ -274,7 +326,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	
 	private void PromptInstructions()
 	{
-		lastState = mainState;
 		mainState = MainState.Instructions;
 		
 		Writer.WriteTextInstant (MessageBook.InstructionsMessage);
@@ -284,7 +335,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	
 	private void PromptGame()
 	{
-		lastState = mainState;
 		mainState = MainState.Game;
 		
 		StartCoroutine (GameCoroutine ());
@@ -292,7 +342,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	
 	private void PromptEnd()
 	{
-		lastState = mainState;
 		mainState = MainState.End;
 		
 		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak +
@@ -301,13 +350,11 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		                        (GameManager.Instance.IsOnline ? "\n[Hold] to share" : ""));
 	}
 
-	private void PromptOptions()
+	private void PromptDifficulty()
 	{
-		lastState = mainState;
-		mainState = MainState.Options;
-		
-		string choiceMessage = "\n[Tap] to cycle \n[Hold] to select\n" + OptionsHandler.GetOptionListString();
+		mainState = MainState.Difficulty;
 
+		string choiceMessage = "[Tap] to cycle \n[Hold] to select\n-----------------\n" + selectionHandler.GetOptionListString();
 		Writer.WriteTextInstant (choiceMessage);
 	}
 	
@@ -327,7 +374,23 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		{
 			GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
 			int wordLimit = GameManager.Instance.Tier.TierWordLimit;
-			float typingSpeed = GameManager.Instance.Tier.TierTypingSpeed;
+
+			float typingSpeed = 0.2f; 
+			switch(difficultyState)
+			{
+				case DifficultyState.Easy:
+					typingSpeed = 0.2f;
+					break;
+				case DifficultyState.Normal:
+					typingSpeed = 0.15f;
+					break;
+				case DifficultyState.Hard:
+					typingSpeed = 0.11f;
+					break;
+				case DifficultyState.Dynamic:
+					typingSpeed = GameManager.Instance.Tier.TierTypingSpeed;
+					break;
+			}
 			
 			// get a random phrase and generate a raw message from the phrase
 			Phrase randomPhrase = PhraseBook.GetPhraseWithWordLimit(wordLimit);
@@ -378,7 +441,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			{
 				if(successSound != null)
 					SoundManager.Instance.PlaySoundModulated(successSound, transform.position);
-				
+
 				GameManager.Instance.Streak = Math.Min(SCORE_MAX, GameManager.Instance.Streak + 1);
 				
 				if(currTierIndex + 1 < TierBook.TierList.Count && GameManager.Instance.Streak >= TierBook.TierList[currTierIndex + 1].TierThreshold)
@@ -410,8 +473,13 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 				}
 				
 				// display streaks
-				Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
-				
+				if(difficultyState == DifficultyState.Dynamic && GameManager.Instance.Streak%5 == 0 && GameManager.Instance.Streak != 0)
+				{
+					Writer.WriteTextInstant("SPEED INCREASED\nStreak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
+				} else 
+				{
+					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
+				}
 				yield return StartCoroutine(WaitForSecondsOrTap(2f));
 			}
 			else
@@ -492,8 +560,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 					currentErrorType = ErrorType.ParseInternal;
 				}
 			}
-			
-			lastState = mainState;
+
 			mainState = MainState.SyncError;
 		}
 		
