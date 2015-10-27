@@ -15,13 +15,6 @@ public class EntryController : Controller, InputManager.InputListener
 		Error
 	}
 
-	private enum ErrorType
-	{
-		Unknown,
-		ParseInternal,
-		ParseException
-	}
-
 	public TypeWriter Writer;
 
 	public string GoLevelName;

@@ -1,15 +1,18 @@
 ﻿using UnityEngine;
 using System;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Collections;
 using System.Collections.Generic;
 
 using System.Threading.Tasks;
-
 using Parse;
 
 public class MainController : Controller, InputManager.InputListener, LeaderboardController.LeaderboardListener
 {
+	#region Enum Defs
+
+
 	private enum MainState
 	{
 		Intro,
@@ -19,20 +22,19 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		SyncError
 	}
 
-	private enum ErrorType
-	{
-		Unknown,
-		ParseInternal,
-		ParseException
-	}
+
+	#endregion
+
+	#region Data
+
 
 	// data data
-	public PhraseBook PhraseBook;
 	public TierBook TierBook;
 
 	// modular data
 	public LeaderboardController LeaderboardController;
-	public SharingHandler SharingHandler;
+	public SharingController SharingHandler;
+	public PhraseKeeper PhraseKeeper;
 
 	// type data
 	public TypeWriter Writer;
@@ -42,14 +44,19 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	// internal data
 	private int SCORE_MAX = 8192;
 
-	private MainState lastState;
 	private MainState mainState;
-	private ErrorType currentErrorType;
+	private ErrorHandler.ErrorType currentErrorType;
 	private ParseException.ErrorCode currentErrorCode;
 
 	private bool isSyncing;
 
 	private bool didTap;
+
+
+	#endregion
+
+	#region MonoBehaviour Overrides
+
 
 	protected override void Awake()
 	{
@@ -131,6 +138,12 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		PromptIntro ();
 	}
 
+
+	#endregion
+
+	#region Input Overrides
+
+
 	public void OnTouchBegin()
 	{
 		if (!isActive && !isSyncing && !LeaderboardController.IsActive())
@@ -194,6 +207,12 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		}
 	}
 
+
+	#endregion
+
+	#region Leaderboard Overrides
+
+
 	public void OnLeaderboardActivate() {}
 
 	public void OnLeaderboardEnd()
@@ -209,6 +228,11 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			break;
 		}
 	}
+
+
+	#endregion
+
+	#region Prompt Functions
 
 	private void PromptIntro()
 	{
@@ -252,6 +276,12 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		                        "\n[Hold] to share");
 	}
 
+
+	#endregion
+
+	#region State Coroutines
+
+
 	private IEnumerator InstructionsCoroutine()
 	{
 		yield return StartCoroutine (WaitForSecondsOrTap (4f));
@@ -264,14 +294,17 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		int currTierIndex = 0;
 		GameManager.Instance.Streak = 0;
 
+		GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
+		
+		// this first queue might be local since the phrase keeper might still be fetching from server
+		PhraseKeeper.EnqueuePhrases(GameManager.Instance.Tier.TierWordLimit);
+
 		while (true) 
 		{
-			GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
-			int wordLimit = GameManager.Instance.Tier.TierWordLimit;
 			float typingSpeed = GameManager.Instance.Tier.TierTypingSpeed;
 
 			// get a random phrase and generate a raw message from the phrase
-			Phrase randomPhrase = PhraseBook.GetPhraseWithWordLimit(wordLimit);
+			Phrase randomPhrase = PhraseKeeper.PopPhraseQueue();
 			string correctMessage = randomPhrase.CorrectMessage;
 			string rawMessage = Regex.Replace(correctMessage, @"\s+", "");
 			int wordCount = correctMessage.Split(' ').Length;
@@ -319,12 +352,18 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			{
 				if(successSound != null)
 					SoundManager.Instance.PlaySoundModulated(successSound, transform.position);
-				
-				GameManager.Instance.Streak = Math.Min(SCORE_MAX, GameManager.Instance.Streak + 1);
 
+				// increment streak				
+				GameManager.Instance.Streak = Math.Min(SCORE_MAX, GameManager.Instance.Streak + 1);
+				
+				bool shouldEnqueue = false;
+
+				// increase tier if threshold has been reached
 				if(currTierIndex + 1 < TierBook.TierList.Count && GameManager.Instance.Streak >= TierBook.TierList[currTierIndex + 1].TierThreshold)
 				{
 					currTierIndex++;
+					GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
+					shouldEnqueue = true;
 				}
 
 				// first check if its a new day and update the day
@@ -349,6 +388,9 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 					PlayerPrefs.Save();
 				}
+				
+				if(shouldEnqueue)
+					PhraseKeeper.EnqueuePhrases(GameManager.Instance.Tier.TierWordLimit);
 
 				// display streaks
 				Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
@@ -398,6 +440,12 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		LeaderboardController.Activate ();
 	}
 
+
+	#endregion
+
+	#region Network Coroutines
+
+
 	private IEnumerator SyncCoroutine()
 	{
 		isSyncing = true;
@@ -441,6 +489,12 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		isSyncing = false;
 	}
 
+
+	#endregion
+
+	#region Generic Coroutines
+
+
 	private IEnumerator WaitForTap()
 	{
 		didTap = false;
@@ -473,6 +527,12 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		didTap = false;
 	}
 
+
+	#endregion
+
+	#region Helpers
+	
+
 	private bool ShouldSyncOverall()
 	{
 		if (!GameManager.Instance.IsOnline)
@@ -483,4 +543,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 		return DateTime.UtcNow.Date != ParseUser.CurrentUser.Get<DateTime>(ParseUserUtils.KEY_DAILY_TIMESTAMP).Date;
 	}
+
+
+	#endregion
 }

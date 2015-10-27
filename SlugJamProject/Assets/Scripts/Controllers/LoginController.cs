@@ -21,13 +21,6 @@ public class LoginController : Controller, InputManager.InputListener
 		Ready
 	}
 
-	private enum ErrorType
-	{
-		Unknown,
-		ParseInternal,
-		ParseException
-	}
-
 	// type data
 	public TypeWriter Writer;
 	public TypeWriter AsyncWriter;

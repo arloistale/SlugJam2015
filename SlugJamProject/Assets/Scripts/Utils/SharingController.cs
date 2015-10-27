@@ -7,7 +7,7 @@ using System.IO;
 using System.Collections;
 using System.Runtime.InteropServices;
 
-public class SharingHandler : MonoBehaviour
+public class SharingController : MonoBehaviour
 {
 	public TypeWriter SharingWriter;
 
@@ -97,7 +97,7 @@ public class SharingHandler : MonoBehaviour
 	{
 		#if UNITY_IPHONE || UNITY_IPAD
 
-		SharingiOSBridge.ShareTextWithImage (fullDestination, "Check out my streak in S.pace!");
+		SharingiOSBridge.ShareTextWithImage (fullDestination);
 
 		#endif
 

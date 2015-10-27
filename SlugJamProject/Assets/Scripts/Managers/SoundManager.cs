@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 /// <summary>
 /// Modified from Corgi Engine SoundManager.cs
@@ -94,7 +94,7 @@ public class SoundManager : PersistentSingleton<SoundManager>
 		// we set the audio source volume to the one in parameters
 		audioSource.volume = SfxVolume;
 
-		float randomNormalPitch = Gaussian.Next (1f, 3f);
+		float randomNormalPitch = GaussianUtils.NextGaussian (1f, 3f);
 		audioSource.pitch = randomNormalPitch;
 		// we start playing the sound
 		audioSource.Play(); 

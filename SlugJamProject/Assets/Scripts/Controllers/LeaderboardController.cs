@@ -24,13 +24,6 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		Ready,
 		Error
 	}
-	
-	private enum ErrorType
-	{
-		Unknown,
-		ParseInternal,
-		ParseException
-	}
 
 	// const data
 	public const int PAGINATION_AMOUNT = 10;

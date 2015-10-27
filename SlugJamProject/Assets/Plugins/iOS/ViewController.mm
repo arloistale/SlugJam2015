@@ -5,7 +5,7 @@
     
     //    UIImage *image      = [UIImage imageNamed:imagePath];
     UIImage *image = [UIImage imageWithContentsOfFile:imagePath];
-    NSString *message   = [NSString stringWithUTF8String:shareMessage];
+    NSString *message   = @"Check out my streak in S.pace!";
     NSArray *postItems  = @[message,image];
     
     UIActivityViewController *activityVc = [[UIActivityViewController alloc]initWithActivityItems:postItems applicationActivities:nil];

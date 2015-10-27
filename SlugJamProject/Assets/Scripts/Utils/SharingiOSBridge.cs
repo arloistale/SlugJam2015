@@ -7,11 +7,11 @@ public class SharingiOSBridge
 	#if UNITY_IPHONE
 	
 	[DllImport("__Internal")]
-	private static extern void _TAG_ShareTextWithImage (string iosPath, string message);
+	private static extern void _TAG_ShareTextWithImage (string iosPath);
 
-	public static void ShareTextWithImage (string imagePath, string message)
+	public static void ShareTextWithImage (string imagePath)
 	{
-		_TAG_ShareTextWithImage (imagePath, message);
+		_TAG_ShareTextWithImage (imagePath);
 	}
 	
 	#endif
