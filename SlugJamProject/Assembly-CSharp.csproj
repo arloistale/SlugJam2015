@@ -56,7 +56,7 @@
      <Compile Include="Assets\Scripts\Data\Models\Phrase.cs" />
      <Compile Include="Assets\Scripts\Data\Models\Tier.cs" />
      <Compile Include="Assets\Scripts\Internal\Bootstrap.cs" />
-     <Compile Include="Assets\Scripts\Internal\ListExtensions.cs" />
+     <Compile Include="Assets\Scripts\Internal\IEnumerableExtensions.cs" />
      <Compile Include="Assets\Scripts\Internal\PersistentSingleton.cs" />
      <Compile Include="Assets\Scripts\Managers\GameManager.cs" />
      <Compile Include="Assets\Scripts\Managers\InputManager.cs" />
@@ -67,7 +67,7 @@
      <Compile Include="Assets\Scripts\Utils\OptionsHandler.cs" />
      <Compile Include="Assets\Scripts\Utils\ParseUserUtils.cs" />
      <Compile Include="Assets\Scripts\Utils\PhraseKeeper.cs" />
-     <Compile Include="Assets\Scripts\Utils\SharingController.cs" />
+     <Compile Include="Assets\Scripts\Utils\SharingWorker.cs" />
      <Compile Include="Assets\Scripts\Utils\SharingiOSBridge.cs" />
      <None Include="Assets\Parse\Parse.Unity.xml" />
      <None Include="Assets\link.xml" />

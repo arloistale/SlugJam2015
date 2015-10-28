@@ -15,33 +15,33 @@ public class InputManager : PersistentSingleton<InputManager>
 	/// </summary>
 	private static InputListener inputListener;
 
-	private bool isHolding;
+	public bool isHolding;
 	private bool didExpendHold;
 	private float holdDuration;
 
 	void Start()
 	{
-		isHolding = false;
+		Reset ();
 	}
 
 	void OnApplicationPause()
 	{
-		isHolding = false;
+		Reset ();
 	}
 
 	void OnApplicationFocus()
 	{
-		isHolding = false;
+		Reset ();
 	}
 
 	void Enable()
 	{
-		isHolding = false;
+		Reset ();
 	}
 
 	void Disable()
 	{
-		isHolding = false;
+		Reset ();
 	}
 	
 	/// <summary>
@@ -93,6 +93,13 @@ public class InputManager : PersistentSingleton<InputManager>
 			}
 		}
 	}
+	
+	public void Reset()
+	{
+		isHolding = false;
+		holdDuration = 0;
+		didExpendHold = false;
+	}
 
 	public void EmulateTouchBegin()
 	{
@@ -116,7 +123,7 @@ public class InputManager : PersistentSingleton<InputManager>
 			inputListener.OnTap();
 		}
 
-		holdDuration = 0f;
+		Reset ();
 	}
 
 	/// <summary>

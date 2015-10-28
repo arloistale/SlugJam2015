@@ -37,8 +37,7 @@ public class LoginController : Controller, InputManager.InputListener
 
 	// internal
 	private LoginState loginState;
-	private ErrorType currentErrorType;
-	private ParseException.ErrorCode currentErrorCode;
+	private ErrorInfo errorInfo;
 
 	private string currUsernameStr;
 
@@ -213,12 +212,11 @@ public class LoginController : Controller, InputManager.InputListener
 				if (enumerator.MoveNext()) 
 				{
 					ParseException exception = (ParseException) enumerator.Current;
-					currentErrorCode = exception.Code;
-					currentErrorType = ErrorType.ParseException;
+					errorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 				}
 				else
 				{
-					currentErrorType = ErrorType.ParseInternal;
+					errorInfo = new ErrorInfo(ErrorType.ParseInternal);
 				}
 			}
 			
@@ -235,22 +233,7 @@ public class LoginController : Controller, InputManager.InputListener
 		}
 		else if (loginState == LoginState.Error)
 		{
-			string errorStr = "Unknown error";
-			
-			switch(currentErrorType)
-			{
-			case ErrorType.ParseInternal:
-				errorStr = "Server error";
-				break;
-			case ErrorType.ParseException:
-				if(MessageBook.ParseExceptionMap.ContainsKey(currentErrorCode))
-					errorStr = MessageBook.ParseExceptionMap[currentErrorCode];
-				else
-					errorStr = currentErrorCode + "";
-				break;
-			}
-			
-			AsyncWriter.WriteTextInstant(errorStr + "\n" +
+			AsyncWriter.WriteTextInstant(errorInfo.GetErrorStr() + "\n" +
 			                             "[Tap] to return\n");
 		}
 	}
@@ -277,25 +260,25 @@ public class LoginController : Controller, InputManager.InputListener
 				if (enumerator.MoveNext()) 
 				{
 					ParseException exception = (ParseException) enumerator.Current;
-					currentErrorCode = exception.Code;
-					currentErrorType = ErrorType.ParseException;
+					errorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 				}
 				else
 				{
-					currentErrorType = ErrorType.ParseInternal;
+					errorInfo = new ErrorInfo(ErrorType.ParseInternal);
 				}
 			}
 			
 			loginState = LoginState.Error;
-		} else {
+		} 
+		else
+		{
 			IDictionary<string, object> result = registerTask.Result;
 			// Hack, check for errors
 			object code;
 			if (result.TryGetValue("code", out code)) 
 			{
 				int errorCodeInt = Convert.ToInt32(code);
-				currentErrorCode = (ParseException.ErrorCode) errorCodeInt;
-				currentErrorType = ErrorType.ParseException;
+				errorInfo = new ErrorInfo(ErrorType.ParseException, (ParseException.ErrorCode) errorCodeInt);
 				loginState = LoginState.Error;
 			}
 			else 
@@ -319,12 +302,11 @@ public class LoginController : Controller, InputManager.InputListener
 							if (enumerator.MoveNext()) 
 							{
 								ParseException exception = (ParseException) enumerator.Current;
-								currentErrorCode = exception.Code;
-								currentErrorType = ErrorType.ParseException;
+								errorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 							}
 							else
 							{
-								currentErrorType = ErrorType.ParseInternal;
+								errorInfo = new ErrorInfo(ErrorType.ParseInternal);
 							}
 						}
 						
@@ -346,22 +328,7 @@ public class LoginController : Controller, InputManager.InputListener
 		}
 		else if (loginState == LoginState.Error)
 		{
-			string errorStr = "Unknown error";
-			
-			switch(currentErrorType)
-			{
-			case ErrorType.ParseInternal:
-				errorStr = "Server error";
-				break;
-			case ErrorType.ParseException:
-				if(MessageBook.ParseExceptionMap.ContainsKey(currentErrorCode))
-					errorStr = MessageBook.ParseExceptionMap[currentErrorCode];
-				else
-					errorStr = currentErrorCode + "";
-				break;
-			}
-			
-			AsyncWriter.WriteTextInstant(errorStr + "\n" +
+			AsyncWriter.WriteTextInstant(errorInfo.GetErrorStr() + "\n" +
 			                             "[Tap] to return\n");
 		}
 	}

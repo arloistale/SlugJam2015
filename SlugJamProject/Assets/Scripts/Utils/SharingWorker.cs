@@ -7,7 +7,7 @@ using System.IO;
 using System.Collections;
 using System.Runtime.InteropServices;
 
-public class SharingController : MonoBehaviour
+public class SharingWorker : MonoBehaviour
 {
 	public TypeWriter SharingWriter;
 

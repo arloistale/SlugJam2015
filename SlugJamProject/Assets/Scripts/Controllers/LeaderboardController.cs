@@ -43,11 +43,8 @@ public class LeaderboardController : Controller, InputManager.InputListener
 	private PageState overallPageState;
 	private PageState todayPageState;
 
-	private ErrorType overallErrorType;
-	private ParseException.ErrorCode overallErrorCode;
-
-	private ErrorType todayErrorType;
-	private ParseException.ErrorCode todayErrorCode;
+	private ErrorInfo overallErrorInfo;
+	private ErrorInfo todayErrorInfo;
 
 	protected override void Awake()
 	{
@@ -149,23 +146,8 @@ public class LeaderboardController : Controller, InputManager.InputListener
 			AsyncWriter.WriteTextInstant("Fetching...");
 		}
 		else if (overallPageState == PageState.Error)
-		{
-			string errorStr = "Unknown error";
-			
-			switch(overallErrorType)
-			{
-			case ErrorType.ParseInternal:
-				errorStr = "Server error";
-				break;
-			case ErrorType.ParseException:
-				if(MessageBook.ParseExceptionMap.ContainsKey(overallErrorCode))
-					errorStr = MessageBook.ParseExceptionMap[overallErrorCode];
-				else
-					errorStr = overallErrorCode + "";
-				break;
-			}
-			
-			AsyncWriter.WriteTextInstant(errorStr + "\n" +
+		{	
+			AsyncWriter.WriteTextInstant(overallErrorInfo.GetErrorStr() + "\n" +
 			                        "[Tap] to cycle\n");
 		}
 	}
@@ -188,22 +170,7 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		}
 		else if (todayPageState == PageState.Error)
 		{
-			string errorStr = "Unknown error";
-			
-			switch(todayErrorType)
-			{
-			case ErrorType.ParseInternal:
-				errorStr = "Server error";
-				break;
-			case ErrorType.ParseException:
-				if(MessageBook.ParseExceptionMap.ContainsKey(todayErrorCode))
-					errorStr = MessageBook.ParseExceptionMap[todayErrorCode];
-				else
-					errorStr = todayErrorCode + "";
-				break;
-			}
-			
-			AsyncWriter.WriteTextInstant(errorStr + "\n" +
+			AsyncWriter.WriteTextInstant(todayErrorInfo.GetErrorStr() + "\n" +
 			                             "[Tap] to cycle\n");
 		}
 	}
@@ -247,12 +214,11 @@ public class LeaderboardController : Controller, InputManager.InputListener
 				if (enumerator.MoveNext())
 				{
 					ParseException exception = (ParseException) enumerator.Current;
-					overallErrorCode = exception.Code;
-					overallErrorType = ErrorType.ParseException;
+					overallErrorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 				}
 				else
 				{
-					overallErrorType = ErrorType.ParseInternal;
+					overallErrorInfo = new ErrorInfo(ErrorType.ParseInternal);
 				}
 			}
 			
@@ -288,12 +254,11 @@ public class LeaderboardController : Controller, InputManager.InputListener
 				if (enumerator.MoveNext())
 				{
 					ParseException exception = (ParseException) enumerator.Current;
-					todayErrorCode = exception.Code;
-					todayErrorType = ErrorType.ParseException;
+					todayErrorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 				}
 				else
 				{
-					todayErrorType = ErrorType.ParseInternal;
+					todayErrorInfo = new ErrorInfo(ErrorType.ParseInternal);
 				}
 			}
 			

@@ -40,7 +40,31 @@ Parse.Cloud.define("SubmitStreak", function(request, response) {
       response.success({ "token": savedUser.getSessionToken() });
     },
     error: function(savedUser, error) {
-      response.error({ "code": error.code, "message": error.message });
+      response.error(error);
+    }
+  });
+});
+
+Parse.Cloud.define("FetchPhrases", function(request, response) {
+  var overallLimit = request.params.overallLimit;
+  var todayLimit = request.params.todayLimit;
+  
+  if(typeof(overallLimit) != 'number' || typeof(todayLimit) != 'number')
+    response.error("FetchPhrases: Invalid params");
+
+  var Phrase = Parse.Object.extend("Phrase");
+  var overallQuery = new Parse.Query(Phrase);
+  overallQuery.limit(overallLimit);
+  var todayQuery = new Parse.Query(Phrase);
+  todayQuery.equalTo("playerName", "Dan Stemkoski");
+  todayQuery.limit(todayLimit);
+  var compoundQuery = new Parse.Query.or(todayQuery, overallQuery);
+  query.find({
+    success: function(results) {
+      response.success(results);
+    },
+    error: function(error) {
+      response.error(error);
     }
   });
 });

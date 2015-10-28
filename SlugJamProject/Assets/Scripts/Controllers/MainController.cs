@@ -33,7 +33,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 	// modular data
 	public LeaderboardController LeaderboardController;
-	public SharingController SharingHandler;
+	public SharingWorker SharingHandler;
 	public PhraseKeeper PhraseKeeper;
 
 	// type data
@@ -45,8 +45,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	private int SCORE_MAX = 8192;
 
 	private MainState mainState;
-	private ErrorHandler.ErrorType currentErrorType;
-	private ParseException.ErrorCode currentErrorCode;
+	private ErrorInfo errorInfo;
 
 	private bool isSyncing;
 
@@ -129,11 +128,18 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			// if the user is the same as the before then the local score should be aligned
 			// with the user score
 		}
-
+		
 		GameManager.Instance.DailyStreak = prefsDailyStreak;
 		GameManager.Instance.DailyTimestamp = prefsDailyTimestamp;
 		GameManager.Instance.HighStreak = prefsStreak;
 		GameManager.Instance.Streak = 0;
+		
+		// prefetch if online
+		if(GameManager.Instance.IsOnline)
+		{
+			PhraseKeeper.SetWordLimit(TierBook.TierList[0].TierWordLimit);
+			PhraseKeeper.FetchEnqueuePhrases();
+		}
 
 		PromptIntro ();
 	}
@@ -179,10 +185,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			PromptIntro();
 			break;
 		case MainState.SyncError:
-			if(lastState == MainState.End)
-				PromptEnd();
-			else
-				PromptIntro();
+			PromptIntro();
 			break;
 		}
 	}
@@ -236,7 +239,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 	private void PromptIntro()
 	{
-		lastState = mainState;
 		mainState = MainState.Intro;
 
 		string greetingMessage = (GameManager.Instance.HighStreak > 0) ? 
@@ -249,7 +251,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 	private void PromptInstructions()
 	{
-		lastState = mainState;
 		mainState = MainState.Instructions;
 
 		Writer.WriteTextInstant (MessageBook.InstructionsMessage);
@@ -259,7 +260,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 	private void PromptGame()
 	{
-		lastState = mainState;
 		mainState = MainState.Game;
 
 		StartCoroutine (GameCoroutine ());
@@ -267,8 +267,11 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 	private void PromptEnd()
 	{
-		lastState = mainState;
 		mainState = MainState.End;
+		
+		// prefetch tier 0 phrases before we start
+		PhraseKeeper.SetWordLimit(TierBook.TierList[0].TierWordLimit);
+		PhraseKeeper.FetchEnqueuePhrases();
 		
 		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak +
 		                        "\nHighest: " + GameManager.Instance.HighStreak + 
@@ -288,16 +291,37 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		
 		PromptGame ();
 	}
+	
+	private IEnumerator FetchPhrasesCoroutine()
+	{
+		// only initiate a fetch request if we are not already fetching
+		// this prevents a duplicate request from prefetching (we prefetch Tier 0 quotes when logging in or when we lose)
+		if(PhraseKeeper.keeperState != PhraseKeeper.KeeperState.Fetching)
+		{
+			PhraseKeeper.SetWordLimit(GameManager.Instance.Tier.TierWordLimit);
+			PhraseKeeper.FetchEnqueuePhrases();
+		}
+			
+		Writer.WriteTextInstant("Fetching...");
+		
+		while(!PhraseKeeper.isFetchedReady)
+		{
+			yield return null;
+		}
+	}
 
 	private IEnumerator GameCoroutine()
 	{
 		int currTierIndex = 0;
 		GameManager.Instance.Streak = 0;
-
 		GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
+		PhraseKeeper.SetWordLimit(GameManager.Instance.Tier.TierWordLimit);
 		
-		// this first queue might be local since the phrase keeper might still be fetching from server
-		PhraseKeeper.EnqueuePhrases(GameManager.Instance.Tier.TierWordLimit);
+		// get phrases before we begin, only fetch if we're online
+		if(!GameManager.Instance.IsOnline)
+			PhraseKeeper.FetchEnqueuePhrases();
+		else if(!PhraseKeeper.isFetchedReady)
+			yield return StartCoroutine(FetchPhrasesCoroutine());
 
 		while (true) 
 		{
@@ -363,7 +387,8 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 				{
 					currTierIndex++;
 					GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
-					shouldEnqueue = true;
+					PhraseKeeper.SetWordLimit(GameManager.Instance.Tier.TierWordLimit);
+					PhraseKeeper.FetchEnqueuePhrases();
 				}
 
 				// first check if its a new day and update the day
@@ -389,9 +414,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 					PlayerPrefs.Save();
 				}
 				
-				if(shouldEnqueue)
-					PhraseKeeper.EnqueuePhrases(GameManager.Instance.Tier.TierWordLimit);
-
 				// display streaks
 				Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
 
@@ -413,23 +435,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 			if (mainState == MainState.SyncError)
 			{
-				string errorStr = "Unknown error";
-				
-				switch(currentErrorType)
-				{
-				case ErrorType.ParseInternal:
-					errorStr = "Server error";
-					break;
-				case ErrorType.ParseException:
-					if(MessageBook.ParseExceptionMap.ContainsKey(currentErrorCode))
-						errorStr = MessageBook.ParseExceptionMap[currentErrorCode];
-					else
-						errorStr = currentErrorCode + "";
-					break;
-				}
-				
-				Writer.WriteTextInstant("Sync error\n" +
-				                        errorStr + "\n" +
+				Writer.WriteTextInstant(errorInfo.GetErrorStr() + "\n" +
 				                        "[Tap] to return\n");
 
 				yield break;
@@ -473,16 +479,14 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 				if (enumerator.MoveNext()) 
 				{
 					ParseException exception = (ParseException) enumerator.Current;
-					currentErrorCode = exception.Code;
-					currentErrorType = ErrorType.ParseException;
+					errorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 				}
 				else
 				{
-					currentErrorType = ErrorType.ParseInternal;
+					errorInfo = new ErrorInfo(ErrorType.ParseInternal);
 				}
 			}
 			
-			lastState = mainState;
 			mainState = MainState.SyncError;
 		}
 

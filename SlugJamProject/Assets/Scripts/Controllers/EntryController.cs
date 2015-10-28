@@ -23,8 +23,7 @@ public class EntryController : Controller, InputManager.InputListener
 	// internal data
 	private EntryState entryState;
 
-	private ParseException.ErrorCode currentErrorCode;
-	private ErrorType currentErrorType;
+	private ErrorInfo errorInfo;
 
 	protected override void Awake() 
 	{
@@ -128,12 +127,11 @@ public class EntryController : Controller, InputManager.InputListener
 				if (enumerator.MoveNext()) 
 				{
 					ParseException exception = (ParseException) enumerator.Current;
-					currentErrorCode = exception.Code;
-					currentErrorType = ErrorType.ParseException;
+					errorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 				}
 				else
 				{
-					currentErrorType = ErrorType.ParseInternal;
+					errorInfo = new ErrorInfo(ErrorType.ParseInternal);
 				}
 			}
 			
@@ -146,23 +144,8 @@ public class EntryController : Controller, InputManager.InputListener
 			PromptLoggedIn();
 		}
 		else
-		{
-			string errorStr = "Unknown error";
-			
-			switch(currentErrorType)
-			{
-			case ErrorType.ParseInternal:
-				errorStr = "Server error";
-				break;
-			case ErrorType.ParseException:
-				if(MessageBook.ParseExceptionMap.ContainsKey(currentErrorCode))
-					errorStr = MessageBook.ParseExceptionMap[currentErrorCode];
-				else
-					errorStr = currentErrorCode + "";
-				break;
-			}
-			
-			Writer.WriteTextInstant(errorStr + "\n" +
+		{	
+			Writer.WriteTextInstant(errorInfo.GetErrorStr() + "\n" +
 			                        "[Tap] to refresh\n");
 		}
 	}
