@@ -46,19 +46,13 @@ Parse.Cloud.define("SubmitStreak", function(request, response) {
 });
 
 Parse.Cloud.define("FetchPhrases", function(request, response) {
-  var overallLimit = request.params.overallLimit;
-  var todayLimit = request.params.todayLimit;
-  
-  if(typeof(overallLimit) != 'number' || typeof(todayLimit) != 'number')
+  var requestLimit = request.params.requestLimit;  
+
+  if(typeof(requestLimit) != 'number')
     response.error("FetchPhrases: Invalid params");
 
-  var Phrase = Parse.Object.extend("Phrase");
-  var overallQuery = new Parse.Query(Phrase);
-  overallQuery.limit(overallLimit);
-  var todayQuery = new Parse.Query(Phrase);
-  todayQuery.equalTo("playerName", "Dan Stemkoski");
-  todayQuery.limit(todayLimit);
-  var compoundQuery = new Parse.Query.or(todayQuery, overallQuery);
+  var query = new Parse.Query("Phrase");
+  query.limit(requestLimit);
   query.find({
     success: function(results) {
       response.success(results);

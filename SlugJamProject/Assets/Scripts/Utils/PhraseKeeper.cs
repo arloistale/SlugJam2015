@@ -16,12 +16,10 @@ public class PhraseKeeper : MonoBehaviour
 	}
 	
 	// const data
+	private const int PHRASE_REQUEST_LIMIT = 25;
 	private const int PHRASE_QUEUE_LIMIT = 10;
-	private const float TODAY_PRIORITY = 0.5f;
-	private const float OVERALL_PRIORITY = 0.35f;
-	private const float LOCAL_PRIORITY = 0.15f;
-	
-	private const float REQUEUE_THRESHOLD = 0.15f;
+	private const int COLLECTION_SAFETY_THRESHOLD = 15;
+	private const int QUEUE_SAFETY_THRESHOLD = 5;
 	
 	public PhraseBook LocalBook;
 	
@@ -30,20 +28,18 @@ public class PhraseKeeper : MonoBehaviour
 	public bool isFetchedReady { get; private set; }
 	
 	// internal phrase data
+	private List<Phrase> phraseCollection = new List<Phrase>();
 	private Queue<Phrase> phraseQueue = new Queue<Phrase>();
 	
-	private int wordLimit;
-	
 	// internal data
-	private ErrorInfo errorInfo;
+	public ErrorInfo errorInfo { get; private set; }
 	
 	private Coroutine fetchCoroutine;
 	
 	// fetches phrases from server
-	// or loads from phrasebook if offline
-	// 
-	public void FetchEnqueuePhrases()
+	public void FetchPhrases()
 	{
+		Debug.Log ("Fetching");
 		if(GameManager.Instance.IsOnline)
 		{
 			if(fetchCoroutine != null)
@@ -53,8 +49,59 @@ public class PhraseKeeper : MonoBehaviour
 		}
 		else
 		{
-			EnqueueLocalPhrases();
+			isFetchedReady = true;
+			// TODO: Currently since we're not clearing its possible to get overlapping quotes
+			// is this maybe a good thing?
+			phraseCollection.AddRange(LocalBook.PhraseList);
+			phraseCollection.Shuffle();
 		}
+	}
+	
+	public void EnqueuePhrases(int wordLimit)
+	{
+		string phraseString = "";
+		// first recycle the remaining elements in the queue
+		phraseCollection.AddRange(phraseQueue);
+		if(phraseQueue.Count > 1)
+		{
+			phraseString += "(Shaking it up)";
+			phraseCollection.Shuffle();
+		}
+		phraseQueue.Clear();
+		
+		List<Phrase> finalPhrases = new List<Phrase>();
+		
+		phraseString += "Collection before = " + phraseCollection.Count;
+		
+		if (GameManager.Instance.HighStreak == 0)
+			finalPhrases.Add(new Phrase() { CorrectMessage = "Space This" });
+		
+		// get a filtereed list of phrases from collection adhering to word limit
+		// we keep a ghost of wordLimit and increase until we get something that matches
+		// this means wordLimit is more of a recommendation
+		int tempLimit = wordLimit;
+		while(finalPhrases.Count < QUEUE_SAFETY_THRESHOLD && phraseCollection.Count > 0)
+		{
+			// first we get a listing of the phrases adhering to this temporary limit
+			IEnumerable<Phrase> filteredPhrases = phraseCollection.
+				Where(p => p.CorrectMessage.Split(' ').Length <= tempLimit);
+			int finalCount = finalPhrases.Count;
+			// also ensure that we don't surpass the queue limit
+			// we do this by making sure we don't take more than the remaining difference between limit and currently added
+			filteredPhrases = filteredPhrases.Take(Mathf.Min (filteredPhrases.Count(), PHRASE_QUEUE_LIMIT - finalCount));
+			// then remove these phrases from the collection and add them to final phrases
+			phraseCollection = phraseCollection.Except(filteredPhrases).ToList();
+			finalPhrases.AddRange(filteredPhrases);
+			tempLimit++;
+		}
+		
+		// check if we should refetch and if so begin the fetching
+		if(ShouldRefetch())
+			FetchPhrases();
+		
+		phraseQueue.AddRange(finalPhrases);
+		
+		Debug.Log (phraseString + " | After = " + phraseCollection.Count);
 	}
 	
 	public void StopFetching()
@@ -66,8 +113,11 @@ public class PhraseKeeper : MonoBehaviour
 	public Phrase PopPhraseQueue()
 	{
 		Phrase resultPhrase = phraseQueue.Dequeue();
-		if(ShouldRequeue())
-			FetchEnqueuePhrases();
+		if(IsPhraseQueueEmpty())
+		{
+			EnqueuePhrases(GameManager.Instance.Tier.TierWordLimit);
+			return new Phrase() { CorrectMessage = "We ran out of quotes" };
+		}
 			
 		string debugString = "Popped queue: ";
 		foreach(Phrase phrase in phraseQueue)
@@ -83,11 +133,6 @@ public class PhraseKeeper : MonoBehaviour
 		phraseQueue.Clear();
 	}
 	
-	public void SetWordLimit(int limit)
-	{
-		wordLimit = limit;
-	}
-	
 	public bool IsPhraseQueueEmpty()
 	{
 		return phraseQueue.Count == 0;
@@ -100,30 +145,19 @@ public class PhraseKeeper : MonoBehaviour
 		keeperState = KeeperState.Fetching;
 		isFetchedReady = false;
 		
-		List<Phrase> todayPhrases = new List<Phrase> ();
-		List<Phrase> overallPhrases = new List<Phrase> ();
 		List<Phrase> finalPhrases = new List<Phrase>();
-		
-		if (GameManager.Instance.HighStreak == 0)
-			finalPhrases.Add(new Phrase() { CorrectMessage = "Space This" });
-		
-		// TODO: recycle old phrases
-		int todayLimit = (int)(PHRASE_QUEUE_LIMIT * TODAY_PRIORITY);
-		int overallLimit = (int)(PHRASE_QUEUE_LIMIT * OVERALL_PRIORITY);
 		
 		// prepare the pre-queue list with needed filters
 		IDictionary<string, object> fetchInfo = new Dictionary<string, object>
 		{
-			{ "todayLimit", todayLimit },
-			{ "overallLimit", overallLimit }
+			{ "requestLimit", PHRASE_REQUEST_LIMIT }
 		};
-		Task<IDictionary<string, object>> fetchTask = 
-			ParseCloud.CallFunctionAsync<IDictionary<string, object>> ("FetchPhrases", fetchInfo);
 		
-		while (!fetchTask.IsCompleted) 
-		{
-			yield return null;
-		}
+		//var fetchTask = ParseCloud.CallFunctionAsync<IEnumerable<ParsePhrase>> ("FetchPhrases", fetchInfo);
+		var fetchQuery = new ParseQuery<ParsePhrase>().Limit(PHRASE_REQUEST_LIMIT);
+		var fetchTask = fetchQuery.FindAsync();
+		
+		while (!fetchTask.IsCompleted) yield return null;
 		
 		if (fetchTask.IsFaulted || fetchTask.IsCanceled) 
 		{
@@ -131,6 +165,7 @@ public class PhraseKeeper : MonoBehaviour
 			{
 				if (enumerator.MoveNext ()) 
 				{
+					Debug.Log (enumerator.Current.ToString());
 					ParseException exception = (ParseException)enumerator.Current;
 					errorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 				}
@@ -145,48 +180,30 @@ public class PhraseKeeper : MonoBehaviour
 		} 
 		else
 		{
-			IDictionary<string, object> result = fetchTask.Result;
-			object resultPhrasesRaw;
-			if(result.TryGetValue("resultPhrases", out resultPhrasesRaw))
+			IEnumerable<ParsePhrase> result = fetchTask.Result;
+			if(result != null)
 			{
-				List<Phrase> resultPhrases = (List<Phrase>) resultPhrasesRaw;
-				string debugString = "";
-				foreach(Phrase phrase in resultPhrases)
+				foreach(ParsePhrase phrase in result)
 				{
-					debugString += phrase.CorrectMessage + "|";
+					phraseCollection.Add (new Phrase() { CorrectMessage = phrase.CorrectMessage });
 				}
-				Debug.Log (debugString);
+			}
+			else
+			{
+				errorInfo = new ErrorInfo(ErrorType.ParseInternal);
+				keeperState = KeeperState.Error;
+				yield break;
 			}
 		}
 		
 		isFetchedReady = true;
 		phraseQueue.Clear();
 		phraseQueue.AddRange(finalPhrases);
+		fetchCoroutine = null;
 	}
 	
-	// enqueues local phrases
-	// all phrases in phrase queue will be local if offline
-	// otherwise only (LOCAL_PRIORITY * 100)% phrases will be local
-	private void EnqueueLocalPhrases()
+	private bool ShouldRefetch()
 	{
-		List<Phrase> finalPhrases = new List<Phrase>();
-		
-		if (GameManager.Instance.HighStreak == 0)
-			finalPhrases.Add(new Phrase() { CorrectMessage = "Space This" });
-		
-		List<Phrase> localPhrases = LocalBook.PhraseList.Where (p => p.CorrectMessage.Split (' ').Length <= wordLimit).ToList();
-		localPhrases.Shuffle ();
-		
-		int localLimit = (int)(PHRASE_QUEUE_LIMIT * (GameManager.Instance.IsOnline ? LOCAL_PRIORITY : 1));
-		localPhrases = localPhrases.Take (localLimit).ToList();
-		finalPhrases.AddRange (localPhrases);
-		
-		phraseQueue.Clear();
-		phraseQueue.AddRange(finalPhrases);
-	}
-	
-	private bool ShouldRequeue()
-	{
-		return phraseQueue.Count <= (int)(PHRASE_QUEUE_LIMIT * REQUEUE_THRESHOLD);
+		return phraseCollection.Count <= COLLECTION_SAFETY_THRESHOLD;
 	}
 }

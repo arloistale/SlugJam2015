@@ -53,6 +53,7 @@
      <Compile Include="Assets\Scripts\Data\Books\MessageBook.cs" />
      <Compile Include="Assets\Scripts\Data\Books\PhraseBook.cs" />
      <Compile Include="Assets\Scripts\Data\Books\TierBook.cs" />
+     <Compile Include="Assets\Scripts\Data\Models\Parse\ParsePhrase.cs" />
      <Compile Include="Assets\Scripts\Data\Models\Phrase.cs" />
      <Compile Include="Assets\Scripts\Data\Models\Tier.cs" />
      <Compile Include="Assets\Scripts\Internal\Bootstrap.cs" />
@@ -71,6 +72,9 @@
      <Compile Include="Assets\Scripts\Utils\SharingiOSBridge.cs" />
      <None Include="Assets\Parse\Parse.Unity.xml" />
      <None Include="Assets\link.xml" />
+ <Reference Include="UnityEngine.Advertisements">
+ <HintPath>/Applications/Unity/Unity.app/Contents/UnityExtensions/Unity/Advertisements/UnityEngine.Advertisements.dll</HintPath>
+ </Reference>
  <Reference Include="UnityEngine.UI">
  <HintPath>/Applications/Unity/Unity.app/Contents/UnityExtensions/Unity/GUISystem/UnityEngine.UI.dll</HintPath>
  </Reference>

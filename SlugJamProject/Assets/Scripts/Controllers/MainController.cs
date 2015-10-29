@@ -137,8 +137,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		// prefetch if online
 		if(GameManager.Instance.IsOnline)
 		{
-			PhraseKeeper.SetWordLimit(TierBook.TierList[0].TierWordLimit);
-			PhraseKeeper.FetchEnqueuePhrases();
+			PhraseKeeper.FetchPhrases();
 		}
 
 		PromptIntro ();
@@ -269,10 +268,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	{
 		mainState = MainState.End;
 		
-		// prefetch tier 0 phrases before we start
-		PhraseKeeper.SetWordLimit(TierBook.TierList[0].TierWordLimit);
-		PhraseKeeper.FetchEnqueuePhrases();
-		
 		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak +
 		                        "\nHighest: " + GameManager.Instance.HighStreak + 
 		                        "\n[Tap] to return" +
@@ -294,19 +289,33 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	
 	private IEnumerator FetchPhrasesCoroutine()
 	{
+		if(PhraseKeeper.isFetchedReady)
+			yield break;
+			
 		// only initiate a fetch request if we are not already fetching
 		// this prevents a duplicate request from prefetching (we prefetch Tier 0 quotes when logging in or when we lose)
 		if(PhraseKeeper.keeperState != PhraseKeeper.KeeperState.Fetching)
 		{
-			PhraseKeeper.SetWordLimit(GameManager.Instance.Tier.TierWordLimit);
-			PhraseKeeper.FetchEnqueuePhrases();
+			PhraseKeeper.FetchPhrases();
 		}
 			
-		Writer.WriteTextInstant("Fetching...");
-		
-		while(!PhraseKeeper.isFetchedReady)
+		if(GameManager.Instance.IsOnline)
 		{
-			yield return null;
+			Writer.WriteTextInstant("Fetching...");
+			
+			while(PhraseKeeper.keeperState == PhraseKeeper.KeeperState.Fetching)
+			{
+				yield return null;
+			}
+			
+			if(PhraseKeeper.keeperState == PhraseKeeper.KeeperState.Error)
+			{
+				Writer.WriteTextInstant(PhraseKeeper.errorInfo.GetErrorStr() + "\n" +
+				                             "[Tap] to return\n");
+				yield return StartCoroutine(WaitForTap());
+				StopAllCoroutines();
+				PromptIntro();
+			}
 		}
 	}
 
@@ -314,14 +323,12 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	{
 		int currTierIndex = 0;
 		GameManager.Instance.Streak = 0;
-		GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
-		PhraseKeeper.SetWordLimit(GameManager.Instance.Tier.TierWordLimit);
 		
-		// get phrases before we begin, only fetch if we're online
-		if(!GameManager.Instance.IsOnline)
-			PhraseKeeper.FetchEnqueuePhrases();
-		else if(!PhraseKeeper.isFetchedReady)
-			yield return StartCoroutine(FetchPhrasesCoroutine());
+		// get phrases before we begin
+		yield return StartCoroutine(FetchPhrasesCoroutine());
+		
+		GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
+		PhraseKeeper.EnqueuePhrases(GameManager.Instance.Tier.TierWordLimit);
 
 		while (true) 
 		{
@@ -379,16 +386,13 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 				// increment streak				
 				GameManager.Instance.Streak = Math.Min(SCORE_MAX, GameManager.Instance.Streak + 1);
-				
-				bool shouldEnqueue = false;
 
 				// increase tier if threshold has been reached
 				if(currTierIndex + 1 < TierBook.TierList.Count && GameManager.Instance.Streak >= TierBook.TierList[currTierIndex + 1].TierThreshold)
 				{
 					currTierIndex++;
 					GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
-					PhraseKeeper.SetWordLimit(GameManager.Instance.Tier.TierWordLimit);
-					PhraseKeeper.FetchEnqueuePhrases();
+					PhraseKeeper.EnqueuePhrases(GameManager.Instance.Tier.TierWordLimit);
 				}
 
 				// first check if its a new day and update the day
