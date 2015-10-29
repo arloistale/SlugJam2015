@@ -8,7 +8,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Parse;
 
-public class MainController : Controller, InputManager.InputListener, LeaderboardController.LeaderboardListener
+public class MainController : Controller, InputManager.InputListener, LeaderboardController.LeaderboardListener, OptionsController.OptionsListener
 {
 	#region Enum Defs
 
@@ -19,7 +19,9 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		Instructions,
 		Game,
 		End,
-		SyncError
+		SyncError,
+		Options,
+		Difficulty
 	}
 
 
@@ -28,27 +30,48 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	#region Data
 
 
+	private enum DifficultyState
+	{
+		Easy,
+		Normal,
+		Hard,
+		Dynamic
+	}
+
+	// const data
+	private const int SELECTION_GAME = 0;
+	private const int SELECTION_LEADERBOARD = 1;
+	private const int SELECTION_DIFFICULTY = 2;
+	private const int SELECTION_OPTIONS = 3;
+
 	// data data
 	public TierBook TierBook;
-
+	
 	// modular data
 	public LeaderboardController LeaderboardController;
-	public SharingWorker SharingHandler;
+	public OptionsController OptionsController;
+	
+	public SharingWorker SharingWorker;
 	public PhraseKeeper PhraseKeeper;
-
+	
 	// type data
 	public TypeWriter Writer;
 	public AudioClip errorSound;
 	public AudioClip successSound;
-
+	
+	// internal modules
+	private SelectionHandler selectionHandler;
+	
 	// internal data
+	
 	private int SCORE_MAX = 8192;
 
 	private MainState mainState;
 	private ErrorInfo errorInfo;
 
 	private bool isSyncing;
-
+	private DifficultyState difficultyState;
+	
 	private bool didTap;
 
 
@@ -60,11 +83,18 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	protected override void Awake()
 	{
 		base.Awake ();
-
+		
 		InputManager.Instance.SetInputListener (this);
 		LeaderboardController.SetListener (this);
-	}
+		OptionsController.SetListener (this);
 
+		if(GameManager.Instance.IsOnline)
+			selectionHandler = new SelectionHandler (new List<string> () {"Continue", "Leaderboard", "Difficulty: " + difficultyState, "Options"});
+		else
+			selectionHandler = new SelectionHandler (new List<string> () {"Continue", "Difficulty: " + difficultyState, "Return to Intro"});
+		
+	}
+	
 	private void Start()
 	{
 		// we always store the highscore in player prefs even when online
@@ -84,7 +114,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		string prefsDailyTimestampRaw = PlayerPrefs.GetString (ParseUserUtils.KEY_DAILY_TIMESTAMP, "");
 		DateTime prefsDailyTimestamp = (prefsDailyTimestampRaw.Length > 0) ? 
 			DateTime.FromBinary (Convert.ToInt64 (prefsDailyTimestampRaw)) : DateTime.UtcNow;
-
+		
 		if (GameManager.Instance.IsOnline)
 		{
 			int userStreak = ParseUser.CurrentUser.Get<int> (ParseUserUtils.KEY_STREAK);
@@ -95,7 +125,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 				prefsStreak = userStreak;
 				prefsDailyStreak = userDailyStreak;
 				prefsDailyTimestamp = userDailyTimestamp;
-
+				
 				PlayerPrefs.SetString(ParseUserUtils.KEY_CACHED_ID, ParseUser.CurrentUser.ObjectId);
 				PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, prefsStreak);
 				PlayerPrefs.SetInt (ParseUserUtils.KEY_DAILY_STREAK, prefsDailyStreak);
@@ -110,14 +140,14 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 					PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, prefsStreak);
 					PlayerPrefs.Save();
 				}
-
+				
 				if(userDailyStreak > prefsStreak)
 				{
 					prefsDailyStreak = userDailyStreak;
 					PlayerPrefs.SetInt(ParseUserUtils.KEY_DAILY_STREAK, prefsDailyStreak);
 					PlayerPrefs.Save();
 				}
-
+				
 				if(userDailyTimestamp > prefsDailyTimestamp)
 				{
 					prefsDailyTimestamp = userDailyTimestamp;
@@ -151,34 +181,38 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 	public void OnTouchBegin()
 	{
-		if (!isActive && !isSyncing && !LeaderboardController.IsActive())
+		if (!isActive)
 			return;
 
+		if(isSyncing || LeaderboardController.IsActive() || SharingWorker.isSharing || OptionsController.IsActive())
+			return;
+		
 		if (Writer.GetMode () == TypeWriter.WriterMode.CullSpaces && Writer.isWriting) 
 		{
 			Writer.SetTextStatusColor (TypeWriter.TypeStatus.Success);
 			Writer.AddSpace ();
 		}
 	}
-
+	
 	public void OnTap()
 	{
 		if (!isActive)
 			return;
-
-		if(isSyncing || LeaderboardController.IsActive() || SharingHandler.isSharing)
+		
+		if(isSyncing || LeaderboardController.IsActive() || SharingWorker.isSharing || OptionsController.IsActive())
 			return;
-
+		
 		didTap = true;
-
+		
 		switch (mainState) 
 		{
 		case MainState.Intro:
-			if(GameManager.Instance.HighStreak > 0)
-				PromptGame();
-			else
-				PromptInstructions();
-
+			selectionHandler.Next();
+			PromptIntro();
+			break;
+		case MainState.Difficulty:
+			selectionHandler.Next();
+			PromptDifficulty();
 			break;
 		case MainState.End:
 			PromptIntro();
@@ -188,23 +222,86 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			break;
 		}
 	}
-
+	
 	public void OnHold()
 	{
 		if (!isActive)
 			return;
-
-		if(isSyncing || LeaderboardController.IsActive() || SharingHandler.isSharing)
+		
+		if(isSyncing || LeaderboardController.IsActive() || SharingWorker.isSharing || OptionsController.IsActive())
 			return;
 
 		switch (mainState) 
 		{
 		case MainState.Intro:
 			if(GameManager.Instance.IsOnline)
-				StartCoroutine(LeaderboardCoroutine());
+			{
+				switch(selectionHandler.GetSelectedIndex())
+				{
+					case SELECTION_GAME:
+						PromptGame();
+						break;
+					case SELECTION_LEADERBOARD:
+						StartCoroutine(LeaderboardCoroutine());
+						break;
+					case SELECTION_DIFFICULTY:
+						selectionHandler = new SelectionHandler (new List<string> () {"Easy", "Normal", "Hard", "Dynamic", "Main Menu"});
+						PromptDifficulty();
+						break;
+					case SELECTION_OPTIONS:
+						Writer.ClearWriting();
+						OptionsController.Activate();
+						break;
+				}
+			}
+			else{
+				switch(selectionHandler.GetSelectedIndex())
+				{
+					case 0:
+						PromptGame();
+						break;
+					case 1:
+						selectionHandler = new SelectionHandler (new List<string> () {"Easy", "Normal", "Hard", "Dynamic", "Main Menu"});
+						PromptDifficulty();
+						break;
+					case 2:
+						Application.LoadLevel("Bootstrap");
+						break;
+				}
+			}
+			
+			break;
+		case MainState.Difficulty:
+			switch(selectionHandler.GetSelectedIndex())
+			{
+				case 0:
+					difficultyState = DifficultyState.Easy;
+					break;
+				case 1:
+					difficultyState = DifficultyState.Normal;
+					break;
+				case 2:
+					difficultyState = DifficultyState.Hard;
+					break;
+				case 3:
+					difficultyState = DifficultyState.Dynamic;
+					break;
+				case 4:
+					break;
+			}
+			if(GameManager.Instance.IsOnline)
+				selectionHandler = new SelectionHandler (
+					new List<string> () {"Continue", "Leaderboard", "Difficulty: " + difficultyState, "Options"}
+				);
+			else
+				selectionHandler = new SelectionHandler (
+					new List<string> () {"Continue", "Difficulty: " + difficultyState, "Options"}
+				);
+				
+			PromptIntro();
 			break;
 		case MainState.End:
-			SharingHandler.Share();
+			SharingWorker.Share();
 			break;
 		}
 	}
@@ -214,9 +311,9 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 	#region Leaderboard Overrides
 
-
+	
 	public void OnLeaderboardActivate() {}
-
+	
 	public void OnLeaderboardEnd()
 	{
 		InputManager.Instance.SetInputListener (this);
@@ -233,44 +330,63 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 
 	#endregion
+	
+	#region Options Overrides
+	
+	
+	public void OnOptionsActivate() {}
+	
+	public void OnOptionsEnd()
+	{
+		InputManager.Instance.SetInputListener(this);
+		PromptIntro();
+	}
+	
+	
+	#endregion
 
 	#region Prompt Functions
 
+	
 	private void PromptIntro()
 	{
 		mainState = MainState.Intro;
-
+		
 		string greetingMessage = (GameManager.Instance.HighStreak > 0) ? 
 			("Highest: " + GameManager.Instance.HighStreak) : ("Hello.");
 
-		Writer.WriteTextInstant (greetingMessage + 
-		                         "\n[Tap] to continue" +
-		                         (GameManager.Instance.IsOnline ? "\n[Hold] for leaderboard" : ""));
-	}
+		string choiceMessage = "";
 
+		choiceMessage = "\n[Tap] to cycle \n[Hold] to select\n-----------------\n" + selectionHandler.GetOptionListString();
+		
+		Writer.WriteTextInstant (greetingMessage + choiceMessage);
+		
+
+	}
+	
 	private void PromptInstructions()
 	{
 		mainState = MainState.Instructions;
-
+		
 		Writer.WriteTextInstant (MessageBook.InstructionsMessage);
-
+		
 		StartCoroutine (InstructionsCoroutine ());
 	}
-
+	
 	private void PromptGame()
 	{
 		mainState = MainState.Game;
-
+		
 		StartCoroutine (GameCoroutine ());
 	}
-
+	
 	private void PromptEnd()
 	{
 		mainState = MainState.End;
 		
 		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak +
 		                        "\nHighest: " + GameManager.Instance.HighStreak + 
-		                        "\n[Tap] to return" +
+		                        "\n[Tap] to Main Menu" +
 		                        "\n[Hold] to share");
 	}
 
@@ -279,6 +395,15 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 	#region State Coroutines
 
+
+	private void PromptDifficulty()
+	{
+		mainState = MainState.Difficulty;
+
+		string choiceMessage = "[Tap] to cycle \n[Hold] to select\n-----------------\n" + selectionHandler.GetOptionListString();
+		Writer.WriteTextInstant (choiceMessage);
+	}
+	
 
 	private IEnumerator InstructionsCoroutine()
 	{
@@ -332,41 +457,56 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 
 		while (true) 
 		{
-			float typingSpeed = GameManager.Instance.Tier.TierTypingSpeed;
-
+			float typingSpeed = 0.2f; 
+			switch(difficultyState)
+			{
+				case DifficultyState.Easy:
+					typingSpeed = 0.2f;
+					break;
+				case DifficultyState.Normal:
+					typingSpeed = 0.15f;
+					break;
+				case DifficultyState.Hard:
+					typingSpeed = 0.11f;
+					break;
+				case DifficultyState.Dynamic:
+					typingSpeed = GameManager.Instance.Tier.TierTypingSpeed;
+					break;
+			}
+			
 			// get a random phrase and generate a raw message from the phrase
 			Phrase randomPhrase = PhraseKeeper.PopPhraseQueue();
 			string correctMessage = randomPhrase.CorrectMessage;
 			string rawMessage = Regex.Replace(correctMessage, @"\s+", "");
 			int wordCount = correctMessage.Split(' ').Length;
-
+			
 			Writer.WriteTextInstant (rawMessage + "\n" + wordCount + " words");
-
+			
 			yield return StartCoroutine(WaitForSecondsOrTap(3f));
 			
 			// start writing raw message
 			Writer.SetTypeDuration (typingSpeed);
 			Writer.SetMode(TypeWriter.WriterMode.CullSpaces);
 			Writer.WriteText (correctMessage);
-
+			
 			bool writeResult = true;
-
+			
 			// here we check the written message against the correct message
 			while(Writer.GetMode() == TypeWriter.WriterMode.CullSpaces && Writer.isWriting)
 			{
 				//Writer.setTextToStatusColor(1);
 				string writtenText = Writer.GetWrittenText();
-
+				
 				if(writtenText == correctMessage)
 				{
 					break;
 				}
-
+				
 				if(writtenText != correctMessage.Substring(0, Mathf.Min(correctMessage.Length, writtenText.Length)))
 				{
 					if(errorSound != null)
 						SoundManager.Instance.PlaySound(errorSound, transform.position);
-
+					
 					Writer.SetTextStatusColor(TypeWriter.TypeStatus.Error);
 					Writer.StopWriting();
 					writeResult = false;
@@ -374,11 +514,11 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 				
 				yield return null;
 			}
-
+			
 			yield return new WaitForSeconds(1f);
-
+			
 			Writer.SetTextStatusColor(TypeWriter.TypeStatus.Normal);
-
+			
 			if(writeResult)
 			{
 				if(successSound != null)
@@ -387,14 +527,13 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 				// increment streak				
 				GameManager.Instance.Streak = Math.Min(SCORE_MAX, GameManager.Instance.Streak + 1);
 
-				// increase tier if threshold has been reached
 				if(currTierIndex + 1 < TierBook.TierList.Count && GameManager.Instance.Streak >= TierBook.TierList[currTierIndex + 1].TierThreshold)
 				{
 					currTierIndex++;
 					GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
 					PhraseKeeper.EnqueuePhrases(GameManager.Instance.Tier.TierWordLimit);
 				}
-
+				
 				// first check if its a new day and update the day
 				if(DateTime.UtcNow.Date > GameManager.Instance.DailyTimestamp.ToUniversalTime().Date)
 				{
@@ -402,25 +541,30 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 					GameManager.Instance.DailyTimestamp = DateTime.UtcNow;
 					PlayerPrefs.SetString(ParseUserUtils.KEY_DAILY_TIMESTAMP, GameManager.Instance.DailyTimestamp.ToBinary().ToString());
 				} 
-
+				
 				// TODO: Potential problem here where timestamp might not save
 				if(GameManager.Instance.Streak > GameManager.Instance.DailyStreak)
 				{
 					GameManager.Instance.DailyStreak = GameManager.Instance.Streak;
 					PlayerPrefs.SetInt(ParseUserUtils.KEY_DAILY_STREAK, GameManager.Instance.DailyStreak);
-
+					
 					if(GameManager.Instance.Streak > GameManager.Instance.HighStreak) 
 					{
 						GameManager.Instance.HighStreak = GameManager.Instance.Streak;
 						PlayerPrefs.SetInt(ParseUserUtils.KEY_STREAK, GameManager.Instance.HighStreak);
 					}
-
+					
 					PlayerPrefs.Save();
 				}
 				
 				// display streaks
-				Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
-
+				if(difficultyState == DifficultyState.Dynamic && GameManager.Instance.Streak%5 == 0 && GameManager.Instance.Streak != 0)
+				{
+					Writer.WriteTextInstant("SPEED INCREASED\nStreak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
+				} else 
+				{
+					Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak + "\nHighest: " + GameManager.Instance.HighStreak);
+				}
 				yield return StartCoroutine(WaitForSecondsOrTap(2f));
 			}
 			else
@@ -430,22 +574,22 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			}
 		}
 	}
-
+	
 	private IEnumerator LeaderboardCoroutine()
 	{
 		if (ShouldSyncOverall())
 		{
 			yield return StartCoroutine (SyncCoroutine ());
-
+			
 			if (mainState == MainState.SyncError)
 			{
 				Writer.WriteTextInstant(errorInfo.GetErrorStr() + "\n" +
 				                        "[Tap] to return\n");
-
+				
 				yield break;
 			}
 		}
-
+		
 		Writer.ClearWriting ();
 		LeaderboardController.Activate ();
 	}
@@ -459,9 +603,9 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	private IEnumerator SyncCoroutine()
 	{
 		isSyncing = true;
-
+		
 		Writer.WriteTextInstant("Syncing...");
-
+		
 		IDictionary<string, object> userInfo = new Dictionary<string, object>
 		{
 			{ ParseUserUtils.KEY_STREAK, GameManager.Instance.HighStreak },
@@ -490,10 +634,10 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 					errorInfo = new ErrorInfo(ErrorType.ParseInternal);
 				}
 			}
-			
+
 			mainState = MainState.SyncError;
 		}
-
+		
 		isSyncing = false;
 	}
 
@@ -514,11 +658,11 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		
 		didTap = false;
 	}
-
+	
 	private IEnumerator WaitForSecondsOrTap(float duration)
 	{
 		didTap = false;
-
+		
 		DateTime startTime = DateTime.UtcNow;
 		TimeSpan waitDuration = TimeSpan.FromSeconds(duration);
 		
@@ -531,7 +675,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			
 			yield return null;
 		}
-
+		
 		didTap = false;
 	}
 
@@ -545,13 +689,13 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	{
 		if (!GameManager.Instance.IsOnline)
 			return false;
-
+		
 		if(GameManager.Instance.DailyStreak > ParseUser.CurrentUser.Get<int>(ParseUserUtils.KEY_DAILY_STREAK))
 			return true;
-
+		
 		return DateTime.UtcNow.Date != ParseUser.CurrentUser.Get<DateTime>(ParseUserUtils.KEY_DAILY_TIMESTAMP).Date;
 	}
-
+	
 
 	#endregion
 }

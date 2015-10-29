@@ -19,7 +19,7 @@ public class TypeWriter : MonoBehaviour
 
 	// constants
 	public const float TYPE_DURATION_SHORT = 0.05f;
-	public const float TYPE_DURATION_LONG = 0.5f;
+	public const float TYPE_DURATION_LONG = 0.2f;
 	public const float TYPE_DURATION_MEDIUM = 0.1f;
 
 	// external data
