@@ -16,10 +16,10 @@ public class PhraseKeeper : MonoBehaviour
 	}
 	
 	// const data
-	private const int PHRASE_REQUEST_LIMIT = 25;
-	private const int PHRASE_QUEUE_LIMIT = 10;
-	private const int COLLECTION_SAFETY_THRESHOLD = 15;
-	private const int QUEUE_SAFETY_THRESHOLD = 5;
+	private const int PHRASE_REQUEST_LIMIT = 100;
+	private const int PHRASE_QUEUE_LIMIT = 25;
+	private const int COLLECTION_SAFETY_THRESHOLD = 25;
+	private const int QUEUE_SAFETY_THRESHOLD = 7;
 	
 	public PhraseBook LocalBook;
 	
@@ -36,10 +36,17 @@ public class PhraseKeeper : MonoBehaviour
 	
 	private Coroutine fetchCoroutine;
 	
-	// fetches phrases from server
-	public void FetchPhrases()
+	void Start()
 	{
-		Debug.Log ("Fetching");
+		FetchPhrasesIfNeeded();
+	}
+	
+	// fetches phrases from server
+	public void FetchPhrasesIfNeeded()
+	{
+		if(!ShouldRefetch())
+			return;
+			
 		if(GameManager.Instance.IsOnline)
 		{
 			if(fetchCoroutine != null)
@@ -95,13 +102,11 @@ public class PhraseKeeper : MonoBehaviour
 			tempLimit++;
 		}
 		
-		// check if we should refetch and if so begin the fetching
-		if(ShouldRefetch())
-			FetchPhrases();
+		FetchPhrasesIfNeeded();
 		
 		phraseQueue.AddRange(finalPhrases);
 		
-		Debug.Log (phraseString + " | After = " + phraseCollection.Count);
+		//Debug.Log (phraseString + " | After = " + phraseCollection.Count);
 	}
 	
 	public void StopFetching()
@@ -112,19 +117,21 @@ public class PhraseKeeper : MonoBehaviour
 	
 	public Phrase PopPhraseQueue()
 	{
-		Phrase resultPhrase = phraseQueue.Dequeue();
 		if(IsPhraseQueueEmpty())
 		{
 			EnqueuePhrases(GameManager.Instance.Tier.TierWordLimit);
 			return new Phrase() { CorrectMessage = "We ran out of quotes" };
 		}
-			
+		
+		Phrase resultPhrase = phraseQueue.Dequeue();
+			/*
 		string debugString = "Popped queue: ";
 		foreach(Phrase phrase in phraseQueue)
 		{
 			debugString += phrase.CorrectMessage + "|";
 		}
 		Debug.Log (debugString);
+		*/
 		return resultPhrase;
 	}
 	
@@ -145,18 +152,14 @@ public class PhraseKeeper : MonoBehaviour
 		keeperState = KeeperState.Fetching;
 		isFetchedReady = false;
 		
-		List<Phrase> finalPhrases = new List<Phrase>();
-		
 		// prepare the pre-queue list with needed filters
 		IDictionary<string, object> fetchInfo = new Dictionary<string, object>
 		{
 			{ "requestLimit", PHRASE_REQUEST_LIMIT }
 		};
 		
-		//var fetchTask = ParseCloud.CallFunctionAsync<IEnumerable<ParsePhrase>> ("FetchPhrases", fetchInfo);
-		var fetchQuery = new ParseQuery<ParsePhrase>().Limit(PHRASE_REQUEST_LIMIT);
-		var fetchTask = fetchQuery.FindAsync();
-		
+		var fetchTask = ParseCloud.CallFunctionAsync<IList<ParsePhrase>> ("FetchPhrases", fetchInfo);
+
 		while (!fetchTask.IsCompleted) yield return null;
 		
 		if (fetchTask.IsFaulted || fetchTask.IsCanceled) 
@@ -165,7 +168,6 @@ public class PhraseKeeper : MonoBehaviour
 			{
 				if (enumerator.MoveNext ()) 
 				{
-					Debug.Log (enumerator.Current.ToString());
 					ParseException exception = (ParseException)enumerator.Current;
 					errorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 				}
@@ -180,7 +182,7 @@ public class PhraseKeeper : MonoBehaviour
 		} 
 		else
 		{
-			IEnumerable<ParsePhrase> result = fetchTask.Result;
+			IList<ParsePhrase> result = fetchTask.Result;
 			if(result != null)
 			{
 				foreach(ParsePhrase phrase in result)
@@ -196,9 +198,8 @@ public class PhraseKeeper : MonoBehaviour
 			}
 		}
 		
+		keeperState = KeeperState.Neutral;
 		isFetchedReady = true;
-		phraseQueue.Clear();
-		phraseQueue.AddRange(finalPhrases);
 		fetchCoroutine = null;
 	}
 	

@@ -23,20 +23,19 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		Options,
 		Difficulty
 	}
+	
+	private enum DifficultyState
+	{
+		Normal,
+		Hard,
+		Dynamic
+	}
 
 
 	#endregion
 
 	#region Data
-
-
-	private enum DifficultyState
-	{
-		Easy,
-		Normal,
-		Hard,
-		Dynamic
-	}
+	
 
 	// const data
 	private const int SELECTION_GAME = 0;
@@ -163,12 +162,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		GameManager.Instance.DailyTimestamp = prefsDailyTimestamp;
 		GameManager.Instance.HighStreak = prefsStreak;
 		GameManager.Instance.Streak = 0;
-		
-		// prefetch if online
-		if(GameManager.Instance.IsOnline)
-		{
-			PhraseKeeper.FetchPhrases();
-		}
 
 		PromptIntro ();
 	}
@@ -245,7 +238,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 						StartCoroutine(LeaderboardCoroutine());
 						break;
 					case SELECTION_DIFFICULTY:
-						selectionHandler = new SelectionHandler (new List<string> () {"Easy", "Normal", "Hard", "Dynamic", "Main Menu"});
+						selectionHandler = new SelectionHandler (new List<string> () {"Normal", "Hard", "Dynamic", "Return"});
 						PromptDifficulty();
 						break;
 					case SELECTION_OPTIONS:
@@ -261,7 +254,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 						PromptGame();
 						break;
 					case 1:
-						selectionHandler = new SelectionHandler (new List<string> () {"Easy", "Normal", "Hard", "Dynamic", "Main Menu"});
+						selectionHandler = new SelectionHandler (new List<string> () {"Normal", "Hard", "Dynamic", "Return"});
 						PromptDifficulty();
 						break;
 					case 2:
@@ -275,20 +268,16 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			switch(selectionHandler.GetSelectedIndex())
 			{
 				case 0:
-					difficultyState = DifficultyState.Easy;
-					break;
-				case 1:
 					difficultyState = DifficultyState.Normal;
 					break;
-				case 2:
+				case 1:
 					difficultyState = DifficultyState.Hard;
 					break;
-				case 3:
+				case 2:
 					difficultyState = DifficultyState.Dynamic;
 					break;
-				case 4:
-					break;
 			}
+			
 			if(GameManager.Instance.IsOnline)
 				selectionHandler = new SelectionHandler (
 					new List<string> () {"Continue", "Leaderboard", "Difficulty: " + difficultyState, "Options"}
@@ -404,7 +393,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		Writer.WriteTextInstant (choiceMessage);
 	}
 	
-
 	private IEnumerator InstructionsCoroutine()
 	{
 		yield return StartCoroutine (WaitForSecondsOrTap (4f));
@@ -413,34 +401,24 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	}
 	
 	private IEnumerator FetchPhrasesCoroutine()
-	{
-		if(PhraseKeeper.isFetchedReady)
+	{	
+		if(PhraseKeeper.keeperState != PhraseKeeper.KeeperState.Fetching)
 			yield break;
 			
-		// only initiate a fetch request if we are not already fetching
-		// this prevents a duplicate request from prefetching (we prefetch Tier 0 quotes when logging in or when we lose)
-		if(PhraseKeeper.keeperState != PhraseKeeper.KeeperState.Fetching)
+		Writer.WriteTextInstant("Fetching...");
+		
+		while(PhraseKeeper.keeperState == PhraseKeeper.KeeperState.Fetching)
 		{
-			PhraseKeeper.FetchPhrases();
+			yield return null;
 		}
-			
-		if(GameManager.Instance.IsOnline)
+		
+		if(PhraseKeeper.keeperState == PhraseKeeper.KeeperState.Error)
 		{
-			Writer.WriteTextInstant("Fetching...");
-			
-			while(PhraseKeeper.keeperState == PhraseKeeper.KeeperState.Fetching)
-			{
-				yield return null;
-			}
-			
-			if(PhraseKeeper.keeperState == PhraseKeeper.KeeperState.Error)
-			{
-				Writer.WriteTextInstant(PhraseKeeper.errorInfo.GetErrorStr() + "\n" +
-				                             "[Tap] to return\n");
-				yield return StartCoroutine(WaitForTap());
-				StopAllCoroutines();
-				PromptIntro();
-			}
+			Writer.WriteTextInstant(PhraseKeeper.errorInfo.GetErrorStr() + "\n" +
+			                             "[Tap] to return\n");
+			yield return StartCoroutine(WaitForTap());
+			StopAllCoroutines();
+			PromptIntro();
 		}
 	}
 
@@ -448,21 +426,20 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	{
 		int currTierIndex = 0;
 		GameManager.Instance.Streak = 0;
-		
-		// get phrases before we begin
-		yield return StartCoroutine(FetchPhrasesCoroutine());
-		
 		GameManager.Instance.Tier = TierBook.TierList [currTierIndex];
+		
+		yield return StartCoroutine(FetchPhrasesCoroutine());
+	
 		PhraseKeeper.EnqueuePhrases(GameManager.Instance.Tier.TierWordLimit);
 
 		while (true) 
 		{
+			// get phrases before we begin only if needed
+			yield return StartCoroutine(FetchPhrasesCoroutine());
+			
 			float typingSpeed = 0.2f; 
 			switch(difficultyState)
 			{
-				case DifficultyState.Easy:
-					typingSpeed = 0.2f;
-					break;
 				case DifficultyState.Normal:
 					typingSpeed = 0.15f;
 					break;

@@ -1,3 +1,5 @@
+// functions
+
 Parse.Cloud.define("SignUpCloud", function(request, response) {
   var user = new Parse.User();
   user.set("username", request.params.username);
@@ -51,14 +53,81 @@ Parse.Cloud.define("FetchPhrases", function(request, response) {
   if(typeof(requestLimit) != 'number')
     response.error("FetchPhrases: Invalid params");
 
-  var query = new Parse.Query("Phrase");
-  query.limit(requestLimit);
-  query.find({
-    success: function(results) {
-      response.success(results);
+  var masterQuery = new Parse.Query("Master");
+  masterQuery.first({
+    success: function(master) {
+      var count = master.get("phraseCount");
+      var indexArr = [];
+      for(var i = 0; i < count; ++i)
+        indexArr[i] = i;
+      shuffle(indexArr);
+      indexArr = indexArr.slice(0, requestLimit);
+      var query = new Parse.Query("Phrase");
+      query.containedIn("index", indexArr);
+      query.limit(requestLimit);
+      query.find({
+        success: function(results) {
+          response.success(results);
+        },
+        error: function(error) {
+          response.error(error);
+        }
+      }); 
     },
     error: function(error) {
-      response.error(error);
+      status.error("Unable to get phrase count: " + error.toString());
     }
   });
 });
+
+// jobs
+
+Parse.Cloud.job("PhraseEnumeration", function(request, status) {
+  // Query for the master
+  var masterQuery = new Parse.Query("Master");
+  masterQuery.first({
+    success: function(master) {
+      var index = 0;
+      var query = new Parse.Query("Phrase");
+      query.each(function(phrase) {
+        // Set and save the change
+        phrase.set("index", index);
+        index++;
+        return phrase.save();
+      }).then(function() {
+        master.set("phraseCount", index);
+        master.save().then(function() {
+          // Set the job's success status
+          status.success("Enumeration completed successfully.");
+        }, function(error) {
+          status.error("Counting: " + error.toString());
+        });
+      }, function(error) {
+        // Set the job's error status
+        status.error("Phrase query: " + error.toString());
+      });   
+    },
+    error: function(error) {
+      status.error("Unable to index: " + error.toString());
+    }
+  });
+});
+
+function shuffle(array) {
+  var currentIndex = array.length, temporaryValue, randomIndex ;
+
+  // While there remain elements to shuffle...
+  while (0 !== currentIndex) {
+
+    // Pick a remaining element...
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex -= 1;
+
+    // And swap it with the current element.
+    temporaryValue = array[currentIndex];
+    array[currentIndex] = array[randomIndex];
+    array[randomIndex] = temporaryValue;
+  }
+
+  return array;
+}

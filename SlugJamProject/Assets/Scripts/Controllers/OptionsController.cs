@@ -68,7 +68,7 @@ public class OptionsController : Controller, InputManager.InputListener
 	public void Activate()
 	{
 		isActive = true;
-		selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Main Menu"});
+		selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Return"});
 		InputManager.Instance.SetInputListener (this);
 
 		PromptOptions ();
@@ -278,7 +278,7 @@ public class OptionsController : Controller, InputManager.InputListener
 		if (optionsState != OptionsState.Error) 
 		{
 			AsyncWriter.StopWriting();
-			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Main Menu"});
+			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Return"});
 			PromptOptions();
 		} 
 		else 
@@ -334,7 +334,7 @@ public class OptionsController : Controller, InputManager.InputListener
 		if (optionsState != OptionsState.Error) 
 		{
 			AsyncWriter.StopWriting();
-			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Main Menu"});
+			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Return"});
 			PromptOptions();
 		} 
 		else 
