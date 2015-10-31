@@ -68,7 +68,7 @@ public class OptionsController : Controller, InputManager.InputListener
 	public void Activate()
 	{
 		isActive = true;
-		selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Return"});
+		selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Main Menu"});
 		InputManager.Instance.SetInputListener (this);
 
 		PromptOptions ();
@@ -123,19 +123,44 @@ public class OptionsController : Controller, InputManager.InputListener
 		if (!isActive)
 			return;
 
-		switch(selectionHandler.GetSelectedIndex())
+		switch(optionsState)
 		{
-			case SELECTION_CHANGE_USERNAME:
-				PromptChangeUsername();
+			case OptionsState.ChoiceSelection:
+				switch(selectionHandler.GetSelectedIndex())
+				{
+					case SELECTION_CHANGE_USERNAME:
+						PromptChangeUsername();
+						break;
+					case SELECTION_CHANGE_PASSWORD:
+						PromptChangePassword();
+						break;
+					case SELECTION_LOGOUT:
+						Logout();
+						break;
+					case SELECTION_RETURN:
+						End();
+						break;
+				}
 				break;
-			case SELECTION_CHANGE_PASSWORD:
-				PromptChangePassword();
+			case OptionsState.ChangeUsername:
+				AsyncWriter.StopWriting();
+				HeaderWriter.ClearWriting();
+				//AsyncWriter.ClearWriting();
+				SelectionWriter.ClearWriting ();
+				UsernameCanvasGroup.alpha = 0;
+				UsernameCanvasGroup.blocksRaycasts = false;
+				UsernameCanvasGroup.interactable = false;
+				PromptOptions();
 				break;
-			case SELECTION_LOGOUT:
-				Logout();
-				break;
-			case SELECTION_RETURN:
-				End();
+			case OptionsState.ChangePassword:
+				AsyncWriter.StopWriting();
+				HeaderWriter.ClearWriting();
+				//AsyncWriter.ClearWriting();
+				SelectionWriter.ClearWriting ();
+				PasswordCanvasGroup.alpha = 0;
+				PasswordCanvasGroup.blocksRaycasts = false;
+				PasswordCanvasGroup.interactable = false;
+				PromptOptions();				
 				break;
 		}
 	}
@@ -248,6 +273,7 @@ public class OptionsController : Controller, InputManager.InputListener
 
 	private IEnumerator ChangeUsernameCoroutine(string usernameStr)
 	{
+		string cachedUsername = ParseUser.CurrentUser.Username;
 		ParseUser.CurrentUser.Username = usernameStr;
 		Task changeTask = ParseUser.CurrentUser.SaveAsync ();
 		
@@ -278,7 +304,7 @@ public class OptionsController : Controller, InputManager.InputListener
 		if (optionsState != OptionsState.Error) 
 		{
 			AsyncWriter.StopWriting();
-			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Return"});
+			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Main Menu"});
 			PromptOptions();
 		} 
 		else 
@@ -297,6 +323,8 @@ public class OptionsController : Controller, InputManager.InputListener
 				break;
 			}
 			
+			ParseUser.CurrentUser.Username = cachedUsername;
+			
 			AsyncWriter.WriteTextInstant (errorStr + "\n" +
 				"[Tap] to return\n");
 		}
@@ -304,6 +332,7 @@ public class OptionsController : Controller, InputManager.InputListener
 
 	private IEnumerator ChangePasswordCoroutine(string passwordStr)
 	{
+		// TODO: MAY BE BUGGY SINCE INSTANCE PARSEUSER WILL RETAIN CHANGED PASSWORD REGARDLESS OF WHETHER SAVE WAS SUCCESSFUL
 		ParseUser.CurrentUser.Password = passwordStr;
 		Task changeTask = ParseUser.CurrentUser.SaveAsync ();
 		
@@ -334,7 +363,7 @@ public class OptionsController : Controller, InputManager.InputListener
 		if (optionsState != OptionsState.Error) 
 		{
 			AsyncWriter.StopWriting();
-			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Return"});
+			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Main Menu"});
 			PromptOptions();
 		} 
 		else 
