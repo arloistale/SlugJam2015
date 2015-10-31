@@ -14,4 +14,25 @@ public class Controller : MonoBehaviour
 	{
 		return isActive;
 	}
+	
+	public void GoToLevel(string levelName)
+	{
+		StartCoroutine(GoToLevelCoroutine(levelName));
+	}
+	
+	/// <summary>
+	/// Waits for a short time and then loads the specified level
+	/// </summary>
+	private IEnumerator GoToLevelCoroutine(string levelName)
+	{
+		isActive = false;
+		
+		if (!string.IsNullOrEmpty(levelName))
+			Application.LoadLevel(levelName);
+		
+		GameManager.Instance.Reset ();
+		InputManager.Instance.Reset ();
+		
+		yield return null;
+	}
 }

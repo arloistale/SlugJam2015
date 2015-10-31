@@ -50,11 +50,11 @@ public class EntryController : Controller, InputManager.InputListener
 		{
 		case EntryState.Normal:
 			GameManager.Instance.IsOnline = false;
-			StartCoroutine(GoToLevelCoroutine(GoLevelName));
+			GoToLevel(GoLevelName);
 			break;
 		case EntryState.LoggedIn:
 			GameManager.Instance.IsOnline = true;
-			StartCoroutine(GoToLevelCoroutine(GoLevelName));
+			GoToLevel(GoLevelName);
 			break;
 		case EntryState.Error:
 			PromptStart();
@@ -80,7 +80,7 @@ public class EntryController : Controller, InputManager.InputListener
 				
 				break;
 			case EntryState.Normal:
-				StartCoroutine (GoToLevelCoroutine(LoginLevelName));
+				GoToLevel(LoginLevelName);
 			break;
 		}
 	}
@@ -148,20 +148,5 @@ public class EntryController : Controller, InputManager.InputListener
 			Writer.WriteTextInstant(errorInfo.GetErrorStr() + "\n" +
 			                        "[Tap] to refresh\n");
 		}
-	}
-
-	/// <summary>
-	/// Waits for a short time and then loads the specified level
-	/// </summary>
-	private IEnumerator GoToLevelCoroutine(string levelName)
-	{
-		isActive = false;
-
-		if (!string.IsNullOrEmpty(levelName))
-			Application.LoadLevel(levelName);
-		
-		GameManager.Instance.Reset ();
-		
-		yield return null;
 	}
 }

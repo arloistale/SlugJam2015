@@ -77,18 +77,22 @@ public class InputManager : PersistentSingleton<InputManager>
 
 		if(Input.touchCount > 0)
 		{
-			Touch mainTouch = Input.touches[0];
-			if (mainTouch.tapCount == 1)
+			for(int i = 0; i < Input.touches.Length; i++)
 			{
-				if(mainTouch.phase == TouchPhase.Began)
+				if (Input.touches[i].tapCount == 1)
 				{
-					if(!isHolding)
-						OnTouchBegin();
-				}
-				else if(mainTouch.phase == TouchPhase.Ended)
-				{
-					if(isHolding)
-						OnTouchEnd();
+					Touch mainTouch = Input.touches[i];
+					if(mainTouch.phase == TouchPhase.Began)
+					{
+						if(!isHolding)
+							OnTouchBegin();
+					}
+					else if(mainTouch.phase == TouchPhase.Ended)
+					{
+						if(isHolding)
+							OnTouchEnd();
+					}
+					break;
 				}
 			}
 		}
@@ -97,7 +101,7 @@ public class InputManager : PersistentSingleton<InputManager>
 	public void Reset()
 	{
 		isHolding = false;
-		holdDuration = 0;
+		holdDuration = 0f;
 		didExpendHold = false;
 	}
 
@@ -118,6 +122,7 @@ public class InputManager : PersistentSingleton<InputManager>
 	{
 		isHolding = false;
 		
+		Debug.Log (holdDuration);
 		if(holdDuration < DURATION_HOLD)
 		{
 			inputListener.OnTap();
