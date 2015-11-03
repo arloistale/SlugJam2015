@@ -50,16 +50,14 @@ public class LoginController : Controller, InputManager.InputListener
 	
 	private void Start()
 	{
-		PromptUsername ();
+		StartCoroutine(PromptCoroutine ());
 	}
 	
-	void OnApplicationFocus()
+	private IEnumerator PromptCoroutine()
 	{
-		if(loginState == LoginState.Username)
-			EventSystem.current.SetSelectedGameObject(UsernameField.gameObject, null);
+		yield return null;
 		
-		if(loginState == LoginState.Password)
-			EventSystem.current.SetSelectedGameObject(PasswordField.gameObject, null);
+		PromptUsername();
 	}
 	
 	public void OnTouchBegin()
@@ -74,12 +72,10 @@ public class LoginController : Controller, InputManager.InputListener
 		switch (loginState)
 		{
 		case LoginState.Username:
-			if(!TouchScreenKeyboard.visible)
-				SubmitUsername(UsernameField.text);
+			SubmitUsername(UsernameField.text);
 			break;
 		case LoginState.Password:
-			if(!TouchScreenKeyboard.visible)
-				SubmitPasswordAuth(PasswordField.text);
+			SubmitPasswordAuth(PasswordField.text);
 			break;
 		case LoginState.Error:
 			PromptUsername ();
@@ -122,7 +118,9 @@ public class LoginController : Controller, InputManager.InputListener
 		
 		currUsernameStr = "";
 		UsernameField.text = "";
-		EventSystem.current.SetSelectedGameObject(UsernameField.gameObject, null);
+		
+		UsernameField.ActivateInputField();
+		UsernameField.Select();
 	}
 	
 	private void PromptPassword()
@@ -144,7 +142,8 @@ public class LoginController : Controller, InputManager.InputListener
 		
 		PasswordField.text = "";
 		
-		EventSystem.current.SetSelectedGameObject(PasswordField.gameObject, null);
+		PasswordField.ActivateInputField();
+		PasswordField.Select();
 	}
 	
 	private void SubmitUsername(string usernameStr)
@@ -203,9 +202,22 @@ public class LoginController : Controller, InputManager.InputListener
 	{
 		Task<ParseUser> authTask = ParseUser.LogInAsync (usernameStr, passwordStr);
 		
-		while (!authTask.IsCompleted) yield return null;
+		DateTime startTime = DateTime.UtcNow;
+		TimeSpan waitDuration = TimeSpan.FromSeconds(TimeUtils.TIMEOUT_DURATION);
+		while (!authTask.IsCompleted) 
+		{
+			if(DateTime.UtcNow - startTime >= waitDuration) 
+				break;
+			
+			yield return null;
+		}
 		
-		if (authTask.IsFaulted || authTask.IsCanceled)
+		if(!authTask.IsCompleted)
+		{
+			errorInfo = new ErrorInfo(ErrorType.Timeout);
+			loginState = LoginState.Error;
+		}
+		else if (authTask.IsFaulted)
 		{
 			using (IEnumerator<System.Exception> enumerator = authTask.Exception.InnerExceptions.GetEnumerator()) 
 			{
@@ -248,12 +260,22 @@ public class LoginController : Controller, InputManager.InputListener
 		Task<IDictionary<string, object>> registerTask = 
 			ParseCloud.CallFunctionAsync<IDictionary<string, object>> ("SignUpCloud", userInfo);
 		
+		DateTime startTime = DateTime.UtcNow;
+		TimeSpan waitDuration = TimeSpan.FromSeconds(TimeUtils.TIMEOUT_DURATION);
 		while (!registerTask.IsCompleted) 
 		{
+			if(DateTime.UtcNow - startTime >= waitDuration) 
+				break;
+			
 			yield return null;
 		}
 		
-		if (registerTask.IsFaulted || registerTask.IsCanceled)
+		if(!registerTask.IsCompleted)
+		{
+			errorInfo = new ErrorInfo(ErrorType.Timeout);
+			loginState = LoginState.Error;
+		}
+		else if (registerTask.IsFaulted)
 		{
 			using (IEnumerator<System.Exception> enumerator = registerTask.Exception.InnerExceptions.GetEnumerator()) 
 			{
@@ -269,7 +291,7 @@ public class LoginController : Controller, InputManager.InputListener
 			}
 			
 			loginState = LoginState.Error;
-		} 
+		}
 		else
 		{
 			IDictionary<string, object> result = registerTask.Result;

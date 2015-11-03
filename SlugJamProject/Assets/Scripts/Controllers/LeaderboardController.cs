@@ -182,7 +182,7 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		ListingWriter.ClearWriting ();
 		AsyncWriter.WriteTextInstant ("Options\n" +
 		                              "[Tap] to cycle\n" +
-		                              "[Hold] to return");
+		                              "[Hold] for Main Menu");
 	}
 
 	private IEnumerator FetchCoroutine()
@@ -202,12 +202,22 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		
 		Task<IEnumerable<ParseUser>> overallTask = overallQuery.FindAsync ();
 		
+		DateTime startTime = DateTime.UtcNow;
+		TimeSpan waitDuration = TimeSpan.FromSeconds(TimeUtils.TIMEOUT_DURATION);
 		while (!overallTask.IsCompleted) 
 		{
+			if(DateTime.UtcNow - startTime >= waitDuration) 
+				break;
+			
 			yield return null;
 		}
 		
-		if (overallTask.IsFaulted || overallTask.IsCanceled)
+		if(!overallTask.IsCompleted)
+		{
+			overallErrorInfo = new ErrorInfo(ErrorType.Timeout);
+			overallPageState = PageState.Error;
+		}
+		else if (overallTask.IsFaulted)
 		{
 			using (IEnumerator<System.Exception> enumerator = overallTask.Exception.InnerExceptions.GetEnumerator()) 
 			{
@@ -242,12 +252,22 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		
 		Task<IEnumerable<ParseUser>> todayTask = todayQuery.FindAsync ();
 		
+		startTime = DateTime.UtcNow;
+		waitDuration = TimeSpan.FromSeconds(TimeUtils.TIMEOUT_DURATION);
 		while (!todayTask.IsCompleted) 
 		{
+			if(DateTime.UtcNow - startTime >= waitDuration) 
+				break;
+			
 			yield return null;
 		}
 		
-		if (todayTask.IsFaulted || todayTask.IsCanceled)
+		if(!todayTask.IsCompleted)
+		{
+			todayErrorInfo = new ErrorInfo(ErrorType.Timeout);
+			todayPageState = PageState.Error;
+		}
+		else if (todayTask.IsFaulted)
 		{
 			using (IEnumerator<System.Exception> enumerator = todayTask.Exception.InnerExceptions.GetEnumerator()) 
 			{

@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 using System.Collections.Generic;
 using System.Collections;
 using System.Threading.Tasks;
@@ -15,6 +16,7 @@ public class EntryController : Controller, InputManager.InputListener
 		Error
 	}
 
+	public TypeWriter HeaderWriter;
 	public TypeWriter Writer;
 
 	public string GoLevelName;
@@ -100,27 +102,43 @@ public class EntryController : Controller, InputManager.InputListener
 	private void PromptLoggedIn()
 	{
 		entryState = EntryState.LoggedIn;
-		Writer.WriteTextInstant ("Logged in as " + ParseUser.CurrentUser.Username + "\n"+
+		HeaderWriter.WriteTextInstant("S.pace");
+		Writer.WriteTextInstant ("Logged in: " + ParseUser.CurrentUser.Username + "\n"+
 		                         "[Tap] to play\n" +
-		                         "[Hold] to logout\n");
+		                         "[Hold] to logout");
 	}
 
 	private void PromptNormal()
 	{
 		entryState = EntryState.Normal;
+		HeaderWriter.WriteTextInstant("S.pace");
 		Writer.WriteTextInstant ("[Tap] to play offline\n" +
-		                         "[Hold] to login or signup\n");
+		                         "[Hold] to login or signup");
 	}
 
 	private IEnumerator FetchCoroutine()
 	{
+		HeaderWriter.ClearWriting();
 		Writer.WriteTextInstant ("Fetching...");
 		
 		Task<ParseUser> fetchTask = ParseUser.CurrentUser.FetchIfNeededAsync ();
 		
-		while (!fetchTask.IsCompleted) yield return null;
+		DateTime startTime = DateTime.UtcNow;
+		TimeSpan waitDuration = TimeSpan.FromSeconds(TimeUtils.TIMEOUT_DURATION);
+		while (!fetchTask.IsCompleted) 
+		{
+			if(DateTime.UtcNow - startTime >= waitDuration) 
+				break;
+			
+			yield return null;
+		}
 		
-		if (fetchTask.IsFaulted || fetchTask.IsCanceled)
+		if (!fetchTask.IsCompleted)
+		{
+			errorInfo = new ErrorInfo(ErrorType.Timeout);
+			entryState = EntryState.Error;
+		}
+		else if(fetchTask.IsFaulted)
 		{
 			using (IEnumerator<System.Exception> enumerator = fetchTask.Exception.InnerExceptions.GetEnumerator()) 
 			{

@@ -17,7 +17,7 @@ public class InputManager : PersistentSingleton<InputManager>
 
 	public bool isHolding;
 	private bool didExpendHold;
-	private float holdDuration;
+	private float touchDuration;
 
 	void Start()
 	{
@@ -55,44 +55,36 @@ public class InputManager : PersistentSingleton<InputManager>
 
 		if (isHolding) 
 		{
-			if (!didExpendHold && holdDuration >= DURATION_HOLD) 
+			if (!didExpendHold && touchDuration >= DURATION_HOLD) 
 			{
 				didExpendHold = true;
 				inputListener.OnHold ();
 			}
 
-			holdDuration += Time.deltaTime;
+			touchDuration += Time.deltaTime;
 		}
 
 		if (CrossPlatformInputManager.GetButtonDown ("Space")) 
 		{
-			if(!isHolding)
-				OnTouchBegin();
+			OnTouchBegin();
 		}
 		else if (CrossPlatformInputManager.GetButtonUp ("Space")) 
 		{
-			if(isHolding)
-				OnTouchEnd();
+			OnTouchEnd();
 		}
 
 		if(Input.touchCount > 0)
 		{
 			for(int i = 0; i < Input.touches.Length; i++)
 			{
-				if (Input.touches[i].tapCount == 1)
+				Touch mainTouch = Input.touches[i];
+				if(mainTouch.phase == TouchPhase.Began)
 				{
-					Touch mainTouch = Input.touches[i];
-					if(mainTouch.phase == TouchPhase.Began)
-					{
-						if(!isHolding)
-							OnTouchBegin();
-					}
-					else if(mainTouch.phase == TouchPhase.Ended)
-					{
-						if(isHolding)
-							OnTouchEnd();
-					}
-					break;
+					OnTouchBegin();
+				}
+				else if(mainTouch.phase == TouchPhase.Ended)
+				{
+					OnTouchEnd();
 				}
 			}
 		}
@@ -101,18 +93,16 @@ public class InputManager : PersistentSingleton<InputManager>
 	public void Reset()
 	{
 		isHolding = false;
-		holdDuration = 0f;
+		touchDuration = 0f;
 		didExpendHold = false;
-	}
-
-	public void EmulateTouchBegin()
-	{
-		OnTouchBegin ();
 	}
 
 	private void OnTouchBegin()
 	{
-		holdDuration = 0f;
+		if(isHolding)
+			return;
+			
+		touchDuration = 0f;
 		didExpendHold = false;
 		isHolding = true;
 		inputListener.OnTouchBegin ();
@@ -120,10 +110,10 @@ public class InputManager : PersistentSingleton<InputManager>
 
 	private void OnTouchEnd()
 	{
-		isHolding = false;
-		
-		Debug.Log (holdDuration);
-		if(holdDuration < DURATION_HOLD)
+		if(!isHolding)
+			return;
+			
+		if(touchDuration < DURATION_HOLD)
 		{
 			inputListener.OnTap();
 		}

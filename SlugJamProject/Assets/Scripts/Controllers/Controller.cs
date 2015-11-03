@@ -31,7 +31,6 @@ public class Controller : MonoBehaviour
 			Application.LoadLevel(levelName);
 		
 		GameManager.Instance.Reset ();
-		InputManager.Instance.Reset ();
 		
 		yield return null;
 	}

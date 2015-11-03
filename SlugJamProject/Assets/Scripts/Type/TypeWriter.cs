@@ -180,6 +180,8 @@ public class TypeWriter : MonoBehaviour
 				currTypeMessage += letter;
 				SetTextStatusColor(TypeStatus.Normal);
 			}
+			else
+				continue;
 
 			TypeText.text = currTypeMessage + "|";
 

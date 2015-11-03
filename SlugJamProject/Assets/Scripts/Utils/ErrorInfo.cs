@@ -4,7 +4,8 @@ public enum ErrorType
 {
 	Unknown,
 	ParseInternal,
-	ParseException
+	ParseException,
+	Timeout
 }
 
 public struct ErrorInfo
@@ -38,6 +39,9 @@ public struct ErrorInfo
 					errorStr = MessageBook.ParseExceptionMap[ErrorCode];
 				else
 					errorStr = ErrorCode + "";
+				break;
+			case ErrorType.Timeout:
+				errorStr = "Server timeout";
 				break;
 		}
 		

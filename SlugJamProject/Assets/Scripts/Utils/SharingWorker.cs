@@ -97,6 +97,7 @@ public class SharingWorker : MonoBehaviour
 	{
 		#if UNITY_IPHONE || UNITY_IPAD
 
+		InputManager.Instance.Reset();
 		SharingiOSBridge.ShareTextWithImage (fullDestination);
 
 		#endif

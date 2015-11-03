@@ -23,13 +23,6 @@ public class OptionsController : Controller, InputManager.InputListener
 		Error
 	}
 
-	private enum ErrorType
-	{
-		Unknown,
-		ParseInternal,
-		ParseException
-	}
-
 
 	#endregion
 
@@ -54,8 +47,7 @@ public class OptionsController : Controller, InputManager.InputListener
 	private SelectionHandler selectionHandler;
 	private OptionsListener optionsListener;
 
-	private ErrorType currentErrorType;
-	private ParseException.ErrorCode currentErrorCode;
+	private ErrorInfo errorInfo;
 	
 	private OptionsState optionsState;
 
@@ -68,7 +60,7 @@ public class OptionsController : Controller, InputManager.InputListener
 	public void Activate()
 	{
 		isActive = true;
-		selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Return"});
+		selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Menu"});
 		InputManager.Instance.SetInputListener (this);
 
 		PromptOptions ();
@@ -105,12 +97,10 @@ public class OptionsController : Controller, InputManager.InputListener
 				PromptOptions ();
 				break;
 			case OptionsState.ChangeUsername:
-				if(!TouchScreenKeyboard.visible)
-					SubmitChangeUsername(UsernameField.text);
+				SubmitChangeUsername(UsernameField.text);
 				break;
 			case OptionsState.ChangePassword:
-				if(!TouchScreenKeyboard.visible)
-					SubmitChangePassword(PasswordField.text);
+				SubmitChangePassword(PasswordField.text);
 				break;
 			case OptionsState.Error:
 				PromptOptions();
@@ -123,19 +113,44 @@ public class OptionsController : Controller, InputManager.InputListener
 		if (!isActive)
 			return;
 
-		switch(selectionHandler.GetSelectedIndex())
+		switch(optionsState)
 		{
-			case SELECTION_CHANGE_USERNAME:
-				PromptChangeUsername();
+			case OptionsState.ChoiceSelection:
+				switch(selectionHandler.GetSelectedIndex())
+				{
+					case SELECTION_CHANGE_USERNAME:
+						PromptChangeUsername();
+						break;
+					case SELECTION_CHANGE_PASSWORD:
+						PromptChangePassword();
+						break;
+					case SELECTION_LOGOUT:
+						Logout();
+						break;
+					case SELECTION_RETURN:
+						End();
+						break;
+				}
 				break;
-			case SELECTION_CHANGE_PASSWORD:
-				PromptChangePassword();
+			case OptionsState.ChangeUsername:
+				AsyncWriter.StopWriting();
+				HeaderWriter.ClearWriting();
+				//AsyncWriter.ClearWriting();
+				SelectionWriter.ClearWriting ();
+				UsernameCanvasGroup.alpha = 0;
+				UsernameCanvasGroup.blocksRaycasts = false;
+				UsernameCanvasGroup.interactable = false;
+				PromptOptions();
 				break;
-			case SELECTION_LOGOUT:
-				Logout();
-				break;
-			case SELECTION_RETURN:
-				End();
+			case OptionsState.ChangePassword:
+				AsyncWriter.StopWriting();
+				HeaderWriter.ClearWriting();
+				//AsyncWriter.ClearWriting();
+				SelectionWriter.ClearWriting ();
+				PasswordCanvasGroup.alpha = 0;
+				PasswordCanvasGroup.blocksRaycasts = false;
+				PasswordCanvasGroup.interactable = false;
+				PromptOptions();				
 				break;
 		}
 	}
@@ -175,7 +190,8 @@ public class OptionsController : Controller, InputManager.InputListener
 		UsernameCanvasGroup.interactable = true;
 
 		UsernameField.text = "";
-		EventSystem.current.SetSelectedGameObject(UsernameField.gameObject, null);
+		UsernameField.ActivateInputField();
+		UsernameField.Select();
 	}
 
 	private void PromptChangePassword()
@@ -197,7 +213,8 @@ public class OptionsController : Controller, InputManager.InputListener
 		PasswordCanvasGroup.interactable = true;
 		
 		PasswordField.text = "";
-		EventSystem.current.SetSelectedGameObject(PasswordField.gameObject, null);
+		PasswordField.ActivateInputField();
+		PasswordField.Select();
 	}
 
 	private void Logout()
@@ -248,27 +265,37 @@ public class OptionsController : Controller, InputManager.InputListener
 
 	private IEnumerator ChangeUsernameCoroutine(string usernameStr)
 	{
+		string cachedUsername = ParseUser.CurrentUser.Username;
 		ParseUser.CurrentUser.Username = usernameStr;
 		Task changeTask = ParseUser.CurrentUser.SaveAsync ();
 		
+		DateTime startTime = DateTime.UtcNow;
+		TimeSpan waitDuration = TimeSpan.FromSeconds(TimeUtils.TIMEOUT_DURATION);
 		while (!changeTask.IsCompleted) 
 		{
+			if(DateTime.UtcNow - startTime >= waitDuration) 
+				break;
+			
 			yield return null;
 		}
 		
-		if (changeTask.IsFaulted || changeTask.IsCanceled)
+		if(!changeTask.IsCompleted)
+		{
+			errorInfo = new ErrorInfo(ErrorType.Timeout);
+			optionsState = OptionsState.Error;
+		}
+		else if (changeTask.IsFaulted)
 		{
 			using (IEnumerator<System.Exception> enumerator = changeTask.Exception.InnerExceptions.GetEnumerator()) 
 			{
 				if (enumerator.MoveNext()) 
 				{
 					ParseException exception = (ParseException) enumerator.Current;
-					currentErrorCode = exception.Code;
-					currentErrorType = ErrorType.ParseException;
+					errorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 				}
 				else
 				{
-					currentErrorType = ErrorType.ParseInternal;
+					errorInfo = new ErrorInfo(ErrorType.ParseInternal);
 				}
 			}
 			
@@ -278,53 +305,51 @@ public class OptionsController : Controller, InputManager.InputListener
 		if (optionsState != OptionsState.Error) 
 		{
 			AsyncWriter.StopWriting();
-			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Return"});
+			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Menu"});
 			PromptOptions();
 		} 
 		else 
-		{
-			string errorStr = "Unknown error";
+		{	
+			ParseUser.CurrentUser.Username = cachedUsername;
 			
-			switch (currentErrorType) {
-			case ErrorType.ParseInternal:
-				errorStr = "Server error";
-				break;
-			case ErrorType.ParseException:
-				if (MessageBook.ParseExceptionMap.ContainsKey (currentErrorCode))
-					errorStr = MessageBook.ParseExceptionMap [currentErrorCode];
-				else
-					errorStr = currentErrorCode + "";
-				break;
-			}
-			
-			AsyncWriter.WriteTextInstant (errorStr + "\n" +
+			AsyncWriter.WriteTextInstant (errorInfo.GetErrorStr() + "\n" +
 				"[Tap] to return\n");
 		}
 	}
 
 	private IEnumerator ChangePasswordCoroutine(string passwordStr)
 	{
+		// TODO: MAY BE BUGGY SINCE INSTANCE PARSEUSER WILL RETAIN CHANGED PASSWORD REGARDLESS OF WHETHER SAVE WAS SUCCESSFUL
 		ParseUser.CurrentUser.Password = passwordStr;
 		Task changeTask = ParseUser.CurrentUser.SaveAsync ();
 		
+		DateTime startTime = DateTime.UtcNow;
+		TimeSpan waitDuration = TimeSpan.FromSeconds(TimeUtils.TIMEOUT_DURATION);
 		while (!changeTask.IsCompleted) 
 		{
+			if(DateTime.UtcNow - startTime >= waitDuration) 
+				break;
+			
 			yield return null;
 		}
 		
-		if (changeTask.IsFaulted || changeTask.IsCanceled)
+		if(!changeTask.IsCompleted)
+		{
+			errorInfo = new ErrorInfo(ErrorType.Timeout);
+			optionsState = OptionsState.Error;
+		}
+		else if (changeTask.IsFaulted)
 		{
 			using (IEnumerator<System.Exception> enumerator = changeTask.Exception.InnerExceptions.GetEnumerator()) 
 			{
 				if (enumerator.MoveNext()) 
 				{
 					ParseException exception = (ParseException) enumerator.Current;
-					currentErrorCode = exception.Code;
-					currentErrorType = ErrorType.ParseException;
+					errorInfo = new ErrorInfo(ErrorType.ParseException, exception.Code);
 				}
 				else
 				{
-					currentErrorType = ErrorType.ParseInternal;
+					errorInfo = new ErrorInfo(ErrorType.ParseInternal);
 				}
 			}
 			
@@ -334,26 +359,12 @@ public class OptionsController : Controller, InputManager.InputListener
 		if (optionsState != OptionsState.Error) 
 		{
 			AsyncWriter.StopWriting();
-			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Return"});
+			selectionHandler = new SelectionHandler (new List<string> () {"Change Username", "Change Password", "Logout: " + ParseUser.CurrentUser.Username, "Menu"});
 			PromptOptions();
 		} 
 		else 
 		{
-			string errorStr = "Unknown error";
-			
-			switch (currentErrorType) {
-			case ErrorType.ParseInternal:
-				errorStr = "Server error";
-				break;
-			case ErrorType.ParseException:
-				if (MessageBook.ParseExceptionMap.ContainsKey (currentErrorCode))
-					errorStr = MessageBook.ParseExceptionMap [currentErrorCode];
-				else
-					errorStr = currentErrorCode + "";
-				break;
-			}
-			
-			AsyncWriter.WriteTextInstant (errorStr + "\n" +
+			AsyncWriter.WriteTextInstant (errorInfo.GetErrorStr() + "\n" +
 				"[Tap] to return\n");
 		}
 	}
