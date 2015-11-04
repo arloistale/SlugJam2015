@@ -38,8 +38,11 @@ public class LoginController : Controller, InputManager.InputListener
 	// internal
 	private LoginState loginState;
 	private ErrorInfo errorInfo;
+	
+	private bool canSubmit;
 
 	private string currUsernameStr;
+	private string currPasswordStr;
 	
 	protected override void Awake()
 	{
@@ -57,7 +60,7 @@ public class LoginController : Controller, InputManager.InputListener
 	{
 		yield return null;
 		
-		PromptUsername();
+		StartCoroutine(PromptUsernameCoroutine());
 	}
 	
 	public void OnTouchBegin()
@@ -72,13 +75,13 @@ public class LoginController : Controller, InputManager.InputListener
 		switch (loginState)
 		{
 		case LoginState.Username:
-			SubmitUsername(UsernameField.text);
+			SubmitUsername();
 			break;
 		case LoginState.Password:
-			SubmitPasswordAuth(PasswordField.text);
+			SubmitPasswordAuth();
 			break;
 		case LoginState.Error:
-			PromptUsername ();
+			StartCoroutine(PromptUsernameCoroutine ());
 			break;
 		}
 	}
@@ -94,12 +97,12 @@ public class LoginController : Controller, InputManager.InputListener
 			GoToLevel(CancelLevelName);
 			break;
 		case LoginState.Password:
-			SubmitPasswordRegister(PasswordField.text);
+			SubmitPasswordRegister();
 			break;
 		}
 	}
 	
-	private void PromptUsername()
+	private IEnumerator PromptUsernameCoroutine ()
 	{
 		AsyncWriter.ClearWriting ();
 		
@@ -121,9 +124,16 @@ public class LoginController : Controller, InputManager.InputListener
 		
 		UsernameField.ActivateInputField();
 		UsernameField.Select();
+		
+		canSubmit = false;
+		while(TouchScreenKeyboard.visible)
+		{
+			yield return null;
+		}
+		canSubmit = true;
 	}
 	
-	private void PromptPassword()
+	private IEnumerator PromptPasswordCoroutine()
 	{
 		AsyncWriter.ClearWriting ();
 		
@@ -140,29 +150,46 @@ public class LoginController : Controller, InputManager.InputListener
 		PasswordCanvasGroup.blocksRaycasts = true;
 		PasswordCanvasGroup.interactable = true;
 		
+		currPasswordStr = "";
 		PasswordField.text = "";
 		
 		PasswordField.ActivateInputField();
 		PasswordField.Select();
+		
+		canSubmit = false;
+		while(TouchScreenKeyboard.visible)
+		{
+			yield return null;
+		}
+		canSubmit = true;
 	}
 	
-	private void SubmitUsername(string usernameStr)
+	private void SubmitUsername()
 	{
-		if (usernameStr.Length == 0) 
+		if(!canSubmit)
+			return;
+			
+		currUsernameStr = UsernameField.text;
+		
+		if (currUsernameStr.Length == 0) 
 		{
-			PromptUsername();
+			StartCoroutine(PromptUsernameCoroutine());
 			return;
 		}
 		
-		currUsernameStr = usernameStr;
-		PromptPassword();
+		StartCoroutine(PromptPasswordCoroutine());
 	}
 	
-	private void SubmitPasswordAuth(string passwordStr)
+	private void SubmitPasswordAuth()
 	{
-		if (currUsernameStr.Length == 0 || passwordStr.Length == 0) 
+		if(!canSubmit)
+			return;
+			
+		currPasswordStr = PasswordField.text;
+		
+		if (currUsernameStr.Length == 0 || currPasswordStr.Length == 0) 
 		{
-			PromptPassword();
+			StartCoroutine(PromptPasswordCoroutine());
 			return;
 		}
 		
@@ -175,14 +202,19 @@ public class LoginController : Controller, InputManager.InputListener
 		Writer.ClearWriting ();
 		AsyncWriter.RepeatText ("...");
 		
-		StartCoroutine (AuthCoroutine (currUsernameStr, passwordStr));
+		StartCoroutine (AuthCoroutine (currUsernameStr, currPasswordStr));
 	}
 	
-	private void SubmitPasswordRegister(string passwordStr)
+	private void SubmitPasswordRegister()
 	{
-		if (currUsernameStr.Length == 0 || passwordStr.Length == 0) 
+		if(!canSubmit)
+			return;
+			
+		currPasswordStr = PasswordField.text;
+		
+		if (currUsernameStr.Length == 0 || currPasswordStr.Length == 0) 
 		{
-			PromptPassword();
+			StartCoroutine(PromptPasswordCoroutine());
 			return;
 		}
 		
@@ -195,7 +227,7 @@ public class LoginController : Controller, InputManager.InputListener
 		Writer.ClearWriting ();
 		AsyncWriter.RepeatText ("...");
 		
-		StartCoroutine (RegisterCoroutine (currUsernameStr, passwordStr));
+		StartCoroutine (RegisterCoroutine (currUsernameStr, currPasswordStr));
 	}
 	
 	private IEnumerator AuthCoroutine(string usernameStr, string passwordStr)
@@ -208,7 +240,7 @@ public class LoginController : Controller, InputManager.InputListener
 		{
 			if(DateTime.UtcNow - startTime >= waitDuration) 
 				break;
-			
+		
 			yield return null;
 		}
 		
@@ -264,7 +296,7 @@ public class LoginController : Controller, InputManager.InputListener
 		TimeSpan waitDuration = TimeSpan.FromSeconds(TimeUtils.TIMEOUT_DURATION);
 		while (!registerTask.IsCompleted) 
 		{
-			if(DateTime.UtcNow - startTime >= waitDuration) 
+			if(DateTime.UtcNow - startTime >= waitDuration)
 				break;
 			
 			yield return null;

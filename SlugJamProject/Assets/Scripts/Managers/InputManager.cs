@@ -15,7 +15,7 @@ public class InputManager : PersistentSingleton<InputManager>
 	/// </summary>
 	private static InputListener inputListener;
 
-	public bool isHolding;
+	public bool isTouching;
 	private bool didExpendHold;
 	private float touchDuration;
 
@@ -53,7 +53,7 @@ public class InputManager : PersistentSingleton<InputManager>
 		if (inputListener == null)
 			return;
 
-		if (isHolding) 
+		if (isTouching) 
 		{
 			if (!didExpendHold && touchDuration >= DURATION_HOLD) 
 			{
@@ -92,25 +92,30 @@ public class InputManager : PersistentSingleton<InputManager>
 	
 	public void Reset()
 	{
-		isHolding = false;
+		isTouching = false;
 		touchDuration = 0f;
 		didExpendHold = false;
+	}
+	
+	public void EmulateTouch()
+	{
+		OnTouchBegin();
 	}
 
 	private void OnTouchBegin()
 	{
-		if(isHolding)
+		if(isTouching)
 			return;
 			
 		touchDuration = 0f;
 		didExpendHold = false;
-		isHolding = true;
+		isTouching = true;
 		inputListener.OnTouchBegin ();
 	}
 
 	private void OnTouchEnd()
 	{
-		if(!isHolding)
+		if(!isTouching)
 			return;
 			
 		if(touchDuration < DURATION_HOLD)

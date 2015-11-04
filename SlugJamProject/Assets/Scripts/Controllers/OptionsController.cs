@@ -220,7 +220,7 @@ public class OptionsController : Controller, InputManager.InputListener
 	private void Logout()
 	{
 		ParseUser.LogOutAsync();
-		Application.LoadLevel ("Bootstrap");
+		GoToLevel("Entry");
 	}
 
 	private void SubmitChangeUsername(string usernameStr)
