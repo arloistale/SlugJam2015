@@ -31,7 +31,7 @@ public class SharingWorker : MonoBehaviour
 		isSharing = true;
 		string oldWriterMessage = SharingWriter.GetWrittenText();
 
-		#if UNITY_ANDROID || UNITY_IPHONE
+		#if UNITY_ANDROID || UNITY_IPHONE || UNITY_IPAD
 
 		string destination = DateTime.Now.ToString ("yyyy-MM-dd-HHmmss") + ".png";
 		string fullDestination = Path.Combine (Application.persistentDataPath, destination);
@@ -53,7 +53,7 @@ public class SharingWorker : MonoBehaviour
 
 		yield return StartCoroutine(ShareCoroutineAndroid(destination, fullDestination));
 
-		#elif UNITY_IPHONE
+		#elif UNITY_IPHONE || UNITY_IPAD
 
 		yield return StartCoroutine(ShareCoroutineIPhone(destination, fullDestination));
 

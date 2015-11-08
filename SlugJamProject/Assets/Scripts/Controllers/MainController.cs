@@ -283,9 +283,9 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		string choiceMessage = "";
 		
 		if(GameManager.Instance.IsOnline)
-			choiceMessage = "\n[Tap] to continue \n[Hold] for Social";
+			choiceMessage = "\n[Tap] to continue \n[Hold] for social";
 		else
-			choiceMessage = "\n[Tap] to continue \n[Hold] for Login";
+			choiceMessage = "\n[Tap] to continue \n[Hold] for login";
 		
 		Writer.WriteTextInstant (greetingMessage + choiceMessage);
 		
@@ -314,7 +314,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		
 		Writer.WriteTextInstant("Streak: " + GameManager.Instance.Streak +
 		                        "\nHighest: " + GameManager.Instance.HighStreak + 
-		                        "\n[Tap] for Menu" +
+		                        "\n[Tap] for menu" +
 		                        "\n[Hold] to share");
 	}
 
@@ -328,9 +328,8 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		mainState = MainState.Social;
 
 		string choiceMessage = 
-			"Social Menu\n" +
-			"[Tap] for Leaderboard\n" +
-			"[Hold] for Settings";
+			"[Tap] for leaderboard\n" +
+			"[Hold] for settings";
 		Writer.WriteTextInstant (choiceMessage);
 	}
 	
@@ -378,8 +377,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			// get phrases before we begin only if needed
 			yield return StartCoroutine(FetchPhrasesCoroutine());
 			
-			float typingSpeed = 0.15f;
-			
 			// get a random phrase and generate a raw message from the phrase
 			Phrase randomPhrase = PhraseKeeper.PopPhraseQueue();
 			string correctMessage = randomPhrase.CorrectMessage;
@@ -391,7 +388,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			yield return StartCoroutine(WaitForSecondsOrTap(3f));
 			
 			// start writing raw message
-			Writer.SetTypeDuration (typingSpeed);
+			Writer.SetTypeDuration (TypeWriter.TYPE_DURATION_AUTO);
 			Writer.SetMode(TypeWriter.WriterMode.CullSpaces);
 			Writer.WriteText (correctMessage);
 			

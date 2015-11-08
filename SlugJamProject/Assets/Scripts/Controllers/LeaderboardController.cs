@@ -182,7 +182,7 @@ public class LeaderboardController : Controller, InputManager.InputListener
 		ListingWriter.ClearWriting ();
 		AsyncWriter.WriteTextInstant ("Options\n" +
 		                              "[Tap] to cycle\n" +
-		                              "[Hold] for Menu");
+		                              "[Hold] for menu");
 	}
 
 	private IEnumerator FetchCoroutine()

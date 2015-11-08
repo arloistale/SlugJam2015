@@ -19,8 +19,7 @@ public class TypeWriter : MonoBehaviour
 
 	// constants
 	public const float TYPE_DURATION_SHORT = 0.05f;
-	public const float TYPE_DURATION_LONG = 0.2f;
-	public const float TYPE_DURATION_MEDIUM = 0.1f;
+	public const float TYPE_DURATION_AUTO = 0.1667f;
 
 	// external data
 	public AudioClip[] TypeSounds = new AudioClip[] {};
@@ -36,7 +35,7 @@ public class TypeWriter : MonoBehaviour
 	private WriterMode writerMode;
 	private string currTypeMessage;
 	private string finalMessage;
-	private float typePauseDuration = 0.2f;
+	private float typePauseDuration = TYPE_DURATION_AUTO;
 
 	public bool isWriting { get; private set; }
 

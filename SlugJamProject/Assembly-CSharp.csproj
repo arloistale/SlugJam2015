@@ -74,9 +74,6 @@
      <Compile Include="Assets\Scripts\Utils\TimeUtils.cs" />
      <None Include="Assets\Parse\Parse.Unity.xml" />
      <None Include="Assets\link.xml" />
- <Reference Include="UnityEngine.Advertisements">
- <HintPath>/Applications/Unity/Unity.app/Contents/UnityExtensions/Unity/Advertisements/UnityEngine.Advertisements.dll</HintPath>
- </Reference>
  <Reference Include="UnityEngine.UI">
  <HintPath>/Applications/Unity/Unity.app/Contents/UnityExtensions/Unity/GUISystem/UnityEngine.UI.dll</HintPath>
  </Reference>

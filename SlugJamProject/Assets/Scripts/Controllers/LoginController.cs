@@ -36,10 +36,10 @@ public class LoginController : Controller, InputManager.InputListener
 	public InputField PasswordField;
 	
 	// internal
+	private Coroutine inputFieldCoroutine;
+	
 	private LoginState loginState;
 	private ErrorInfo errorInfo;
-	
-	private bool canSubmit;
 
 	private string currUsernameStr;
 	private string currPasswordStr;
@@ -60,7 +60,7 @@ public class LoginController : Controller, InputManager.InputListener
 	{
 		yield return null;
 		
-		StartCoroutine(PromptUsernameCoroutine());
+		PromptUsername ();
 	}
 	
 	public void OnTouchBegin()
@@ -81,7 +81,7 @@ public class LoginController : Controller, InputManager.InputListener
 			SubmitPasswordAuth();
 			break;
 		case LoginState.Error:
-			StartCoroutine(PromptUsernameCoroutine ());
+			PromptUsername ();
 			break;
 		}
 	}
@@ -102,8 +102,8 @@ public class LoginController : Controller, InputManager.InputListener
 		}
 	}
 	
-	private IEnumerator PromptUsernameCoroutine ()
-	{
+	private void PromptUsername ()
+	{	
 		AsyncWriter.ClearWriting ();
 		
 		loginState = LoginState.Username;
@@ -121,19 +121,11 @@ public class LoginController : Controller, InputManager.InputListener
 		
 		currUsernameStr = "";
 		UsernameField.text = "";
-		
 		UsernameField.ActivateInputField();
 		UsernameField.Select();
-		
-		canSubmit = false;
-		while(TouchScreenKeyboard.visible)
-		{
-			yield return null;
-		}
-		canSubmit = true;
 	}
 	
-	private IEnumerator PromptPasswordCoroutine()
+	private void PromptPassword ()
 	{
 		AsyncWriter.ClearWriting ();
 		
@@ -152,44 +144,44 @@ public class LoginController : Controller, InputManager.InputListener
 		
 		currPasswordStr = "";
 		PasswordField.text = "";
-		
 		PasswordField.ActivateInputField();
 		PasswordField.Select();
 		
-		canSubmit = false;
-		while(TouchScreenKeyboard.visible)
-		{
-			yield return null;
-		}
-		canSubmit = true;
+		inputFieldCoroutine = StartCoroutine(EnsureInputFieldCoroutine(PasswordField));
 	}
 	
 	private void SubmitUsername()
 	{
-		if(!canSubmit)
-			return;
-			
+		if(inputFieldCoroutine != null)
+		{
+			StopCoroutine(inputFieldCoroutine);
+			inputFieldCoroutine = null;
+		}
+		
 		currUsernameStr = UsernameField.text;
 		
 		if (currUsernameStr.Length == 0) 
 		{
-			StartCoroutine(PromptUsernameCoroutine());
+			PromptUsername ();
 			return;
 		}
 		
-		StartCoroutine(PromptPasswordCoroutine());
+		PromptPassword ();
 	}
 	
 	private void SubmitPasswordAuth()
 	{
-		if(!canSubmit)
-			return;
-			
+		if(inputFieldCoroutine != null)
+		{
+			StopCoroutine(inputFieldCoroutine);
+			inputFieldCoroutine = null;
+		}
+		
 		currPasswordStr = PasswordField.text;
 		
 		if (currUsernameStr.Length == 0 || currPasswordStr.Length == 0) 
 		{
-			StartCoroutine(PromptPasswordCoroutine());
+			PromptPassword ();
 			return;
 		}
 		
@@ -207,14 +199,17 @@ public class LoginController : Controller, InputManager.InputListener
 	
 	private void SubmitPasswordRegister()
 	{
-		if(!canSubmit)
-			return;
-			
+		if(inputFieldCoroutine != null)
+		{
+			StopCoroutine(inputFieldCoroutine);
+			inputFieldCoroutine = null;
+		}
+		
 		currPasswordStr = PasswordField.text;
 		
 		if (currUsernameStr.Length == 0 || currPasswordStr.Length == 0) 
 		{
-			StartCoroutine(PromptPasswordCoroutine());
+			PromptPassword ();
 			return;
 		}
 		
@@ -228,6 +223,19 @@ public class LoginController : Controller, InputManager.InputListener
 		AsyncWriter.RepeatText ("...");
 		
 		StartCoroutine (RegisterCoroutine (currUsernameStr, currPasswordStr));
+	}
+	
+	private IEnumerator EnsureInputFieldCoroutine(InputField inputField)
+	{
+		yield return null;
+		
+		while(!TouchScreenKeyboard.visible && inputField.text.Length == 0)
+		{
+			inputField.ActivateInputField();
+			inputField.Select();
+			
+			yield return null;
+		}
 	}
 	
 	private IEnumerator AuthCoroutine(string usernameStr, string passwordStr)
