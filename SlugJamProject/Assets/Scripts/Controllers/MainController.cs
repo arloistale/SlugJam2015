@@ -62,6 +62,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	private SelectionHandler selectionHandler;
 	
 	// internal data
+	private Coroutine syncCoroutine;
 	
 	private int SCORE_MAX = 8192;
 
@@ -408,7 +409,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 				if(writtenText != correctMessage.Substring(0, Mathf.Min(correctMessage.Length, writtenText.Length)))
 				{
 					if(errorSound != null)
-						SoundManager.Instance.PlaySound(errorSound, transform.position);
+						SoundManager.Instance.PlaySound(errorSound, 0.5f);
 					
 					Writer.SetTextStatusColor(TypeWriter.TypeStatus.Error);
 					Writer.StopWriting();
@@ -425,7 +426,7 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			if(writeResult)
 			{
 				if(successSound != null)
-					SoundManager.Instance.PlaySoundModulated(successSound, transform.position);
+					SoundManager.Instance.PlaySoundModulated(successSound, 0.5f);
 
 				// increment streak				
 				GameManager.Instance.Streak = Math.Min(SCORE_MAX, GameManager.Instance.Streak + 1);
@@ -466,6 +467,14 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			}
 			else
 			{
+				if(ShouldSyncOverall())
+				{
+					if(syncCoroutine != null)
+						StopCoroutine(syncCoroutine);
+					
+					syncCoroutine = StartCoroutine(SyncCoroutine());
+				}
+				
 				PromptEnd();
 				break;
 			}
@@ -474,9 +483,13 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 	
 	private IEnumerator LeaderboardCoroutine()
 	{
-		if (ShouldSyncOverall())
+		if (ShouldSyncOverall() && !isSyncing)
 		{
-			yield return StartCoroutine (SyncCoroutine ());
+			if(syncCoroutine != null)
+				StopCoroutine(syncCoroutine);
+				
+			syncCoroutine = StartCoroutine (SyncCoroutine ());
+			yield return syncCoroutine;
 			
 			if (mainState == MainState.SyncError)
 			{
@@ -502,10 +515,6 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 		isSyncing = true;
 		
 		Writer.WriteTextInstant("Syncing...");
-		
-		ParseUser.CurrentUser[ParseUserUtils.KEY_STREAK] = GameManager.Instance.HighStreak;
-		ParseUser.CurrentUser[ParseUserUtils.KEY_DAILY_STREAK] = GameManager.Instance.DailyStreak;
-		ParseUser.CurrentUser[ParseUserUtils.KEY_DAILY_TIMESTAMP] = GameManager.Instance.DailyTimestamp;
 		
 		IDictionary<string, object> userInfo = new Dictionary<string, object>
 		{
@@ -547,6 +556,13 @@ public class MainController : Controller, InputManager.InputListener, Leaderboar
 			}
 
 			mainState = MainState.SyncError;
+		}
+		else
+		{
+			// we're good, update the local instance of ParseUser
+			ParseUser.CurrentUser[ParseUserUtils.KEY_STREAK] = GameManager.Instance.HighStreak;
+			ParseUser.CurrentUser[ParseUserUtils.KEY_DAILY_STREAK] = GameManager.Instance.DailyStreak;
+			ParseUser.CurrentUser[ParseUserUtils.KEY_DAILY_TIMESTAMP] = GameManager.Instance.DailyTimestamp;
 		}
 		
 		isSyncing = false;

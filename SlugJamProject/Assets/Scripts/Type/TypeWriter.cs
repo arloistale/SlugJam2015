@@ -58,7 +58,7 @@ public class TypeWriter : MonoBehaviour
 		}
 
 		if (TypeSoundSpace != null) {
-			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
+			SoundManager.Instance.PlaySound (TypeSoundSpace);
 		}
 
 		currTypeMessage = message;
@@ -75,7 +75,7 @@ public class TypeWriter : MonoBehaviour
 		
 		if (TypeSoundSpace != null) 
 		{
-			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
+			SoundManager.Instance.PlaySound (TypeSoundSpace);
 		}
 		
 		TypeText.text += message;
@@ -132,7 +132,7 @@ public class TypeWriter : MonoBehaviour
 	public void AddSpace() 
 	{
 		if(TypeSoundSpace != null)
-			SoundManager.Instance.PlaySound (TypeSoundSpace, transform.position);
+			SoundManager.Instance.PlaySound (TypeSoundSpace);
 
 		if(currTypeMessage != finalMessage)
 			currTypeMessage += ' ';
@@ -187,7 +187,7 @@ public class TypeWriter : MonoBehaviour
 			if (TypeSounds != null) 
 			{
 				int soundIndex = Random.Range(0, TypeSounds.Length);
-				SoundManager.Instance.PlaySound (TypeSounds[soundIndex], transform.position);
+				SoundManager.Instance.PlaySound (TypeSounds[soundIndex]);
 			}
 
 			yield return new WaitForSeconds (typePauseDuration);
@@ -221,7 +221,7 @@ public class TypeWriter : MonoBehaviour
 				if (TypeSounds != null) 
 				{
 					int soundIndex = Random.Range (0, TypeSounds.Length);
-					SoundManager.Instance.PlaySound (TypeSounds [soundIndex], transform.position);
+					SoundManager.Instance.PlaySound (TypeSounds [soundIndex]);
 				}
 				
 				yield return new WaitForSeconds (typePauseDuration);

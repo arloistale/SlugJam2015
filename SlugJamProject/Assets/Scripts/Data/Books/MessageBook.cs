@@ -6,6 +6,8 @@ using Parse;
 
 public class MessageBook
 {
+	public static string AppName = "Spacepace";
+	
 	public static IDictionary<ParseException.ErrorCode, string> ParseExceptionMap = new Dictionary<ParseException.ErrorCode, string>() 
 	{
 		{ ParseException.ErrorCode.ConnectionFailed, "Bad connection" },

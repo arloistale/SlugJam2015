@@ -102,7 +102,7 @@ public class EntryController : Controller, InputManager.InputListener
 	private void PromptLoggedIn()
 	{
 		entryState = EntryState.LoggedIn;
-		HeaderWriter.WriteTextInstant("S.pace");
+		HeaderWriter.WriteTextInstant(MessageBook.AppName);
 		Writer.WriteTextInstant ("Logged in: " + ParseUser.CurrentUser.Username + "\n"+
 		                         "[Tap] to play\n" +
 		                         "[Hold] to logout");
@@ -111,7 +111,7 @@ public class EntryController : Controller, InputManager.InputListener
 	private void PromptNormal()
 	{
 		entryState = EntryState.Normal;
-		HeaderWriter.WriteTextInstant("S.pace");
+		HeaderWriter.WriteTextInstant(MessageBook.AppName);
 		Writer.WriteTextInstant ("[Tap] to play offline\n" +
 		                         "[Hold] to login or signup");
 	}
