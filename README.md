@@ -11,6 +11,7 @@ Spacepace is a word game that has rhythm elements to it. The player is shown a p
 **How**
 Spacepace was developed using Unity's 2D framework. Looking back this wasn't exactly an economic decision since now the game's executable files are bloated and we're not allowed to get rid of the Unity logo that appears at game start unless we shell out thousands of dollars for Unity. Unity was the engine that we were most familiar with and staying in our comfort zone cost us.
 
-Here are the released game links:
+The released game links are listed below.
+
 Android: https://goo.gl/bOVWYN
 iOS: https://goo.gl/K6BZ2I
